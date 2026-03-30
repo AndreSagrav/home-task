@@ -1336,7 +1336,7 @@ body{line-height:1.6;}
 
 <!-- Menú contextual de lista (long-press en tab) -->
 <div id="list-ctx-menu">
-  <button onclick="ctxDeleteList()" class="danger">🗑 Eliminar lista</button>
+  <button onclick="ctxDeleteList()" class="danger">📦 Guardar en cajón</button>
 </div>
 
 <!-- MODAL: Renombrar lista -->
@@ -8389,7 +8389,7 @@ if(!navigator.onLine) showBanner();
     <p id="confirm-modal-msg" style="font-size:.85rem;color:var(--muted);margin:.3rem 0 1rem"></p>
     <div class="modal-acts">
       <button class="m-cancel" onclick="closeModals()">Cancelar</button>
-      <button class="m-confirm" id="confirm-modal-btn" style="background:#C05050;border-color:#C05050" onclick="doConfirm()">Confirmar</button>
+      <button class="m-confirm" id="confirm-modal-btn" onclick="doConfirm()">Confirmar</button>
     </div>
   </div>
 </div>
