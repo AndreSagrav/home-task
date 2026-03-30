@@ -2847,34 +2847,6 @@ function getHouseData(shareCode){
     lists:[
       {id:sid,name:'Compras del Hogar',icon:'🛒',type:'shopping',_tpl:'tpl-compras',tasks:[],
        shopping:{checked:{},customCats:[],subItems:{},customStores:[],itemStores:{},extraItems:{},hiddenStores:{},catNotes:{},itemNotes:{},catNames:{},itemCosts:{},shopSplit:1}},
-      {id:uid(),name:'Pagos y Servicios',icon:'💳',type:'tasks',_tpl:'tpl-pagos',tasks:[],
-       cats:[{id:'tc-'+uid(),name:'Pagos',icon:'💳',subcats:[
-         {id:'sc-'+uid(),name:'Servicios públicos',icon:'💡',payments:[
-           {id:'pay-'+uid(),name:'Luz',  currency:'CRC',amount:'',split:1},
-           {id:'pay-'+uid(),name:'Agua', currency:'CRC',amount:'',split:1},
-         ]},
-         {id:'sc-'+uid(),name:'Préstamos',icon:'🏦',payments:[]},
-         {id:'sc-'+uid(),name:'Seguros',icon:'🔒',payments:[]},
-         {id:'sc-'+uid(),name:'Servicios del Hogar',icon:'📶',payments:[
-           {id:'pay-'+uid(),name:'Internet',currency:'CRC',amount:'',split:1},
-         ]},
-         {id:'sc-'+uid(),name:'Plataformas Digitales',icon:'📱',payments:[
-           {id:'pay-'+uid(),name:'Netflix', currency:'USD',amount:'',split:1},
-           {id:'pay-'+uid(),name:'Spotify', currency:'USD',amount:'',split:1},
-         ]},
-         {id:'sc-'+uid(),name:'Impuestos y Aspectos Legales',icon:'⚖️',note:'Predial, Tasas Municipales',payments:[]},
-         {id:'sc-'+uid(),name:'Mantenimiento y Conservación',icon:'🔧',note:'Reparaciones, Jardinería',payments:[]},
-         {id:'sc-'+uid(),name:'Gastos de Comunidad',icon:'🏘️',note:'Administración, Cuotas',payments:[]},
-       ]}]},
-      {id:uid(),name:'Tareas pendientes',icon:'📋',type:'tasks',tasks:[],
-       cats:[
-         {id:'tc-'+uid(),name:'Equipo y Mobiliario',icon:'🪑',subcats:[
-           {id:'sc-'+uid(),name:'Electrodomésticos',icon:'🔌',payments:[]},
-           {id:'sc-'+uid(),name:'Muebles',icon:'🛋️',payments:[]},
-           {id:'sc-'+uid(),name:'Utensilios del Hogar',icon:'🧹',payments:[]},
-         ]}
-       ]},
-      {id:uid(),name:'Proyectos',icon:'🎯',type:'tasks',_tpl:'tpl-proyectos',tasks:[],cats:[]},
     ],
     activeListId:sid,
     meta:{razonSocial:'',destinatario:''}
