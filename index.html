@@ -522,7 +522,7 @@ main{max-width:1100px;margin:0 auto;padding:2rem 1.4rem;}
 .shop-cat-hdr{display:flex;align-items:center;gap:.5rem;padding:.8rem 1.1rem;cursor:pointer;user-select:none;transition:background .15s;}
 .shop-cat-hdr:hover{background:var(--warm);}
 .cat-ico{font-size:1.1rem;flex-shrink:0;}
-.cat-name{flex:1;font-size:.9rem;font-weight:500;color:var(--esp);}
+.cat-name{flex:1;font-size:1rem;font-weight:600;color:var(--esp);}
 .cat-note{font-size:.66rem;background:var(--b-verd);color:var(--c-verd);border:1px solid var(--br-verd);padding:.09rem .42rem;border-radius:10px;white-space:nowrap;}
 .cat-note.carn{background:var(--b-carn);color:var(--c-carn);border-color:var(--br-carn);}
 .cat-prog{font-size:.7rem;color:var(--muted);background:var(--warm);padding:.09rem .42rem;border-radius:20px;white-space:nowrap;flex-shrink:0;}
@@ -550,7 +550,7 @@ main{max-width:1100px;margin:0 auto;padding:2rem 1.4rem;}
   display:flex;align-items:center;justify-content:center;transition:all .2s;background:var(--bg-card);margin-top:2px;}
 .shop-item.bought .shop-chk{background:var(--sage);border-color:var(--sage);}
 .shop-ibody{flex:1;min-width:0;}
-.shop-iname{font-size:.88rem;color:var(--text);}
+.shop-iname{font-size:.84rem;color:var(--text);}
 .shop-item.bought .shop-iname{text-decoration:line-through;color:var(--muted);}
 .shop-imeta{display:flex;align-items:center;gap:.25rem;flex-wrap:wrap;margin-top:.2rem;}
 .sbadge{font-size:.72rem;padding:.18rem .55rem;border-radius:20px;white-space:nowrap;cursor:default;font-weight:600;letter-spacing:.01em;}
@@ -646,7 +646,7 @@ main{max-width:1100px;margin:0 auto;padding:2rem 1.4rem;}
 .tcat-hdr{display:flex;align-items:center;gap:.5rem;padding:.85rem 1.1rem;cursor:pointer;user-select:none;transition:background .15s;}
 .tcat-hdr:hover{background:var(--warm);}
 .tcat-ico{font-size:1.15rem;flex-shrink:0;}
-.tcat-name{flex:1;font-size:.92rem;font-weight:500;color:var(--esp);}
+.tcat-name{flex:1;font-size:1.05rem;font-weight:600;color:var(--esp);}
 .tcat-count{font-size:.7rem;color:white;background:var(--tc);border-radius:20px;padding:.06rem .48rem;flex-shrink:0;}
 .tcat-count.zero{background:var(--warm);color:var(--muted);}
 .tcat-arr{color:var(--sand);font-size:.74rem;transition:transform .2s;flex-shrink:0;}
@@ -660,7 +660,7 @@ main{max-width:1100px;margin:0 auto;padding:2rem 1.4rem;}
 .sc-hdr{display:flex;align-items:center;gap:.45rem;padding:.7rem .9rem;cursor:pointer;transition:background .15s;}
 .sc-hdr:hover{background:var(--warm);}
 .sc-ico{font-size:1rem;flex-shrink:0;}
-.sc-name{flex:1;font-size:.86rem;font-weight:500;color:var(--esp);}
+.sc-name{flex:1;font-size:.92rem;font-weight:500;color:var(--esp);}
 .sc-count{font-size:.68rem;color:white;background:var(--tc);border-radius:20px;padding:.05rem .42rem;flex-shrink:0;}
 .sc-count.zero{background:var(--warm);color:var(--muted);}
 .sc-arr{color:var(--sand);font-size:.7rem;transition:transform .2s;flex-shrink:0;}
@@ -677,7 +677,7 @@ main{max-width:1100px;margin:0 auto;padding:2rem 1.4rem;}
   display:flex;align-items:center;justify-content:center;transition:all .2s;background:var(--bg-card);}
 .pay-item.paid .pay-chk{background:var(--sage);border-color:var(--sage);}
 .pay-body{flex:1;min-width:0;}
-.pay-name{font-size:.88rem;color:var(--text);}
+.pay-name{font-size:.84rem;color:var(--text);}
 .pay-item.paid .pay-name{text-decoration:line-through;color:var(--muted);}
 .pay-fields{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin-top:.35rem;}
 .pay-amt{width:100px;padding:.25rem .5rem;border:1.5px solid var(--sand);border-radius:9px;
@@ -4485,7 +4485,7 @@ function buildShop(list){
       html+=`<div class="shop-sub-cat ${collapsed?'collapsed':''}">
         <div class="shop-sub-cat-hdr" onclick="toggleCat('${list.id}','${catId}')">
           <span class="cat-ico" style="font-size:.9rem">${catIcon}</span>
-          <span class="cat-name" style="font-size:.85rem">${esc(catDisplayName)}</span>
+          <span class="cat-name">${esc(catDisplayName)}</span>
           <span class="cat-prog" style="font-size:.72rem">${items.length}</span>
           <button class="note-btn ${catNote?'has-note':''}" onclick="toggleNote(event,'cat','${list.id}','${catId}')">📝</button>
           <div class="bulk-cat-chk" title="Marcar todos como comprados"
