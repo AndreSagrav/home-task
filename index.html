@@ -1509,16 +1509,14 @@ async function forceSyncToSupabase(){
 // ── Sincroniza perfil de usuario a Supabase (sin contraseña en texto plano) ──
 async function syncProfileToSupabase(profile){
   try{
-    const update={
+    // Solo sincronizar metadatos — NUNCA password_hash desde aquí
+    // El hash solo se actualiza en doCreateProfile y doChangePassword
+    await sb.from('profiles').upsert({
       id:profile.id,
       name:profile.name,
       email:profile.email||null,
       color:profile.color,
-    };
-    if(profile.password){
-      update.password_hash=await hashPassword(profile.password);
-    }
-    await sb.from('profiles').upsert(update,{onConflict:'id'});
+    },{onConflict:'id',ignoreDuplicates:false});
   }catch(e){console.warn('profile sync:',e.message);}
 }
 
@@ -2215,12 +2213,12 @@ const saveProfiles=async(profiles)=>{
     return {...rest, _pwCached:true};
   });
   localStorage.setItem(K_PROFILES,JSON.stringify(forLocal));
-  // Sync cada perfil a Supabase con hash de contraseña
+  // Sync cada perfil a Supabase — solo metadatos, NUNCA password_hash
   for(const prof of profiles){
     try{
-      const update={id:prof.id, name:prof.name, email:prof.email||null, color:prof.color};
-      if(prof.password) update.password_hash=await hashPassword(prof.password);
-      await sb.from('profiles').upsert(update,{onConflict:'id'});
+      await sb.from('profiles').upsert({
+        id:prof.id, name:prof.name, email:prof.email||null, color:prof.color
+      },{onConflict:'id',ignoreDuplicates:false});
     }catch(e){console.warn('saveProfiles sync:',e.message);}
   }
 };
