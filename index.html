@@ -307,7 +307,7 @@ tbody td{padding:10px 14px;vertical-align:middle}
 .sinst strong{color:var(--gold);font-family:'Montserrat',sans-serif}
 
 /* ══════════════ SORTEO PÚBLICO CSS ══════════════ */
-.spub{position:relative;z-index:1;text-align:center;padding:24px;width:100%}
+.spub{position:relative;z-index:1;text-align:center;padding:24px;width:100%;display:flex;flex-direction:column;align-items:center}
 .sel{font-size:11px;letter-spacing:6px;text-transform:uppercase;color:var(--red);margin-bottom:12px;font-weight:700;font-family:'Montserrat',sans-serif}
 .spub h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(36px,8vw,80px);line-height:.9;margin-bottom:6px}
 .spub h1 span{color:var(--gold);text-shadow:0 0 60px rgba(255,214,0,.6)}
@@ -429,10 +429,10 @@ tbody td{padding:10px 14px;vertical-align:middle}
   .sbtns{gap:8px}
   .s1{font-size:12px;padding:11px 14px}
   /* SORTEO PÚBLICO */
-  .wc{gap:5px}
+  .wc{gap:clamp(8px,2vw,24px)!important}
   .wheel{width:clamp(58px,16vw,90px);height:clamp(76px,20vw,118px)}
   .wdig{font-size:clamp(30px,10vw,54px);height:clamp(30px,10vw,46px)}
-  .wsep{font-size:clamp(26px,7vw,48px)}
+  .wsep{font-size:clamp(36px,6vw,60px)}
   .wcard{padding:16px 14px}
   .wnom{font-size:clamp(24px,7vw,44px)}
 }
@@ -539,7 +539,7 @@ tbody td{padding:10px 14px;vertical-align:middle}
 <footer>
   <p>Rifa Chevrolet Trax 2013</p>
   <p style="margin-top:6px">Organizado por: <strong>César Andrés Batista Vargas</strong> &nbsp;·&nbsp; Cédula <strong>2-0539-0118</strong></p>
-  <p style="margin-top:8px">Consultas: <strong><a href="mailto:batisvar@gmail.com" style="color:var(--gold);text-decoration:none">batisvar@gmail.com</a></strong></p>
+  <p style="margin-top:8px">Consultas: <strong><a href="/cdn-cgi/l/email-protection#bbd9dacfd2c8cddac9fbdcd6dad2d795d8d4d6" style="color:var(--gold);text-decoration:none"><span class="__cf_email__" data-cfemail="a0c2c1d4c9d3d6c1d2e0c7cdc1c9cc8ec3cfcd">[email&#160;protected]</span></a></strong></p>
   <p style="margin-top:14px;font-size:11px;color:#555">La fecha puede adelantarse si se venden todas las acciones antes.</p>
 </footer>
 </div><!-- /vl -->
@@ -789,7 +789,7 @@ tbody td{padding:10px 14px;vertical-align:middle}
 
 <div class="toast" id="toast"></div>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ════════════════════════════════════════
 // CONSTANTS (declared ONCE)
 // ════════════════════════════════════════
@@ -1532,8 +1532,10 @@ function startSorteoPoll(){
         document.getElementById('wm').style.display='block';
         document.getElementById('winn').classList.remove('show');
         for(var w=0;w<4;w++){
-          var wb=document.getElementById('w'+w); if(wb) wb.style.borderColor='#222';
-          var ws=document.getElementById('ws'+w); if(ws) ws.innerHTML='';
+          var wb=document.getElementById('w'+w);
+          if(wb){wb.style.borderColor='#222';wb.style.boxShadow='inset 0 20px 40px rgba(0,0,0,.8)';}
+          var ws=document.getElementById('ws'+w);
+          if(ws){ws.innerHTML='';ws.style.transition='none';ws.style.transform='translateY(0)';}
         }
       } else if(m.t === 'go'){
         document.getElementById('stb').className='stbadge gir';
@@ -1794,11 +1796,4 @@ function launchCelebration(){
   setTimeout(function(){if(fl.parentNode)fl.parentNode.removeChild(fl);},500);
   for(var i=0;i<200;i++){(function(i){setTimeout(function(){
     var el=document.createElement('div'),sz=Math.random()*12+5;
-    el.style.cssText='position:fixed;pointer-events:none;z-index:9999;left:'+Math.random()*100+'vw;top:-20px;width:'+sz+'px;height:'+(Math.random()>.4?sz*.4:sz)+'px;background:'+cols[Math.floor(Math.random()*cols.length)]+';border-radius:'+(Math.random()>.4?'2px':'50%')+';animation:cfall '+(Math.random()*3+2)+'s linear forwards;transform:rotate('+Math.random()*360+'deg);';
-    document.body.appendChild(el);
-    setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},5500);
-  },i*15);})(i);}
-}
-</script>
-</body>
-</html>
+    el.style.cssText='position:fixed;pointer-events:none;z-index:9999;left:'+Math.random()*100+'vw;top:-20px;width:'+sz+'px;height:'+(Math.random()>.4?sz*.4:sz)+'px;background:'+cols[Math.floor(Math.random()*cols.length)]+';border-radius:'+(Math.random()>.4?'2px':'50%')+';animation:cfall '+(Math.r
