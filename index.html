@@ -663,7 +663,7 @@ main{max-width:1100px;margin:0 auto;padding:2rem 1.6rem;}
 .inv-qty{font-size:.75rem;color:var(--muted);}
 .inv-qty strong{color:var(--tc);}
 .inv-actions{display:flex;gap:.3rem;margin-top:.45rem;}
-.inv-btn{flex:1;padding:.26rem;border:none;border-radius:8px;font-size.72rem;cursor:pointer;transition:all .15s;}
+.inv-btn{flex:1;padding:.26rem;border:none;border-radius:8px;font-size:.72rem;cursor:pointer;transition:all .15s;}
 .inv-btn.dec{background:var(--warm);color:var(--tc);}
 .inv-btn.dec:hover{background:var(--sand);}
 .inv-btn.inc{background:var(--tc);color:white;}
@@ -5535,7 +5535,7 @@ function mbcConfirm(){
         price:prices[0].price,currency:_mbc.curr,store:_mbc.selStore?.name||null}];
   savePurchaseHistory(histEntries);
   document.getElementById('modal-buy-confirm').classList.remove('open');
-  renderAll(_mbc?.listId||null);
+  renderAll(_mbc?.lid||null);
   if(document.getElementById('log-panel').classList.contains('open'))renderLog();
 }
 function toggleExtra(lid,tid){
@@ -5600,7 +5600,9 @@ function resetShop(lid){
     });
     s.inventoryPending={};
     s.subItems={};
+    s.subBought={};
     s.itemCosts={};
+    s.subItemCosts={};
     (list.tasks||[]).forEach(t=>{t.done=false;t.doneBy=null;});
     logAction('shop-rst',{list:list.name});
     saveUD(list.id);
@@ -8655,7 +8657,7 @@ function renderSResumen(){
   const uItems=new Set(d.map(r=>r.item_name)).size;
   const uVariants=new Set(d.map(r=>itemKey(r))).size;
   const uStores=new Set(d.filter(r=>r.store).map(r=>r.store)).size;
-  const avgSession=d.length?(totalCRC/new Set(d.map(r=>r.bought_at?.slice(0,10))).size||1):0;
+  const avgSession=d.length?(totalCRC/(new Set(d.map(r=>r.bought_at?.slice(0,10))).size||1)):0;
   document.getElementById('s-kpis').innerHTML=`
     <div class="skpi"><div class="skpi-val">${d.length}</div><div class="skpi-lbl">Compras totales</div></div>
     <div class="skpi"><div class="skpi-val">${uItems} <span style="font-size:.8rem;color:var(--muted)">(${uVariants} var.)</span></div><div class="skpi-lbl">Artículos únicos</div></div>
@@ -8716,7 +8718,7 @@ function renderSResumen(){
   const scnt={};const ucnt={};const ucolor={};
   d.forEach((r,i)=>{
     if(r.store) scnt[r.store]=(scnt[r.store]||0)+1;
-    if(r.bought_by){ucnt[r.bought_by]=(ucnt[r.bought_by]||0)+1;if(!ucolor[r.bought_by])ucolor[r.bought_by]=SCOLS[Object.keys(ucnt).length%SCOLS.length];}
+    if(r.bought_by){const _isNew=!ucolor[r.bought_by];ucnt[r.bought_by]=(ucnt[r.bought_by]||0)+1;if(_isNew)ucolor[r.bought_by]=SCOLS[(Object.keys(ucolor).length-1)%SCOLS.length];}
   });
   const topStore=Object.entries(scnt).sort((a,b)=>b[1]-a[1])[0];
   const topUser=Object.entries(ucnt).sort((a,b)=>b[1]-a[1])[0];
