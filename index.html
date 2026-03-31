@@ -1690,7 +1690,7 @@ function openInvCatModal(lid, itemId, itemName){
   // Mostrar/ocultar badge de sugerencia
   const sugEl=document.getElementById('inv-cat-suggestion');
   if(sugCatId){
-    const allCats=[...BASE_CATALOG,...(list?.shopping?.customCats||[])];
+    const allCats=[...getCatalogForList(list),...(list?.shopping?.customCats||[])];
     const cat=allCats.find(c=>c.id===sugCatId);
     if(cat){
       const displayName=(list?.shopping?.catNames||{})[cat.id]||cat.name;
@@ -1721,7 +1721,7 @@ function openInvCatModal(lid, itemId, itemName){
 function renderInvCatList(lid){
   const list=UD.lists.find(l=>l.id===lid);
   const allCats=[
-    ...BASE_CATALOG.map(c=>({...c,tipo:'base'})),
+    ...getCatalogForList(list).map(c=>({...c,tipo:'base'})),
     ...(list?.shopping?.customCats||[]).map(c=>({...c,tipo:'custom'}))
   ].sort((a,b)=>{
     const na=(list?.shopping?.catNames||{})[a.id]||a.name;
@@ -2173,6 +2173,53 @@ const BASE_CATALOG=[
     {id:'bat-litio',   name:'Batería litio 2031',    stores:['pmm','mayca']},
   ]},
 ];
+
+// ══════════════════════ CATÁLOGO: PAGOS Y SERVICIOS ══════════════════════
+const BASE_CATALOG_PAGOS=[
+  {id:'p-bas', name:'Servicios Básicos',       icon:'💡', items:[
+    {id:'ps-luz',       name:'Luz',                          stores:[]},
+    {id:'ps-agua',      name:'Agua',                         stores:[]},
+    {id:'ps-gas',       name:'Gas',                          stores:[]},
+  ]},
+  {id:'p-con', name:'Conectividad',            icon:'📶', items:[
+    {id:'ps-internet',  name:'Internet',                     stores:[]},
+    {id:'ps-celular',   name:'Celular',                      stores:[]},
+  ]},
+  {id:'p-dig', name:'Suscripciones Digitales', icon:'📱', items:[
+    {id:'ps-stream',    name:'Streaming (Video y Música)',   stores:[]},
+    {id:'ps-cloud',     name:'Almacenamiento y Software',    stores:[]},
+  ]},
+  {id:'p-fin', name:'Finanzas y Seguros',      icon:'🏦', items:[
+    {id:'ps-seguros',   name:'Seguros',                      stores:[]},
+    {id:'ps-prest',     name:'Préstamos',                    stores:[]},
+    {id:'ps-tarjeta',   name:'Tarjetas de Crédito',          stores:[]},
+  ]},
+  {id:'p-mant',name:'Mantenimiento',           icon:'🔧', items:[
+    {id:'ps-arreglos',  name:'Arreglos de Casa',             stores:[]},
+    {id:'ps-taller',    name:'Taller Mecánico',              stores:[]},
+  ]},
+  {id:'p-edu', name:'Educación',               icon:'📚', items:[
+    {id:'ps-mensual',   name:'Mensualidades y Matrícula',    stores:[]},
+    {id:'ps-cursos',    name:'Cursos y Talleres',            stores:[]},
+  ]},
+  {id:'p-sal', name:'Salud y Bienestar',       icon:'💊', items:[
+    {id:'ps-gimnasio',  name:'Gimnasio',                     stores:[]},
+    {id:'ps-medico',    name:'Gastos Médicos',               stores:[]},
+  ]},
+  {id:'p-tra', name:'Transporte',              icon:'🚗', items:[
+    {id:'ps-gasolina',  name:'Gasolina',                     stores:[]},
+    {id:'ps-peajes',    name:'Peajes y Parqueos',            stores:[]},
+  ]},
+  {id:'p-tri', name:'Trámites y Tasas',        icon:'⚖️', items:[
+    {id:'ps-impuestos', name:'Impuestos Municipales',        stores:[]},
+    {id:'ps-licencias', name:'Licencias y Documentos',      stores:[]},
+  ]},
+];
+
+// Devuelve el catálogo correcto según el tipo de lista
+function getCatalogForList(list){
+  return list?._tpl==='tpl-pagos' ? BASE_CATALOG_PAGOS : BASE_CATALOG;
+}
 
 // ══════════════════════ STATE ══════════════════════
 let CU=null, CH=null, UD=null, pendingProfile=null, pendingRememberMe=false;
@@ -4374,7 +4421,7 @@ function countPending(list){
     const extraRaw=list.shopping?.extraItems||{};
     const extraItemsFlat=Array.isArray(extraRaw)?extraRaw:Object.values(extraRaw).flat();
     const allShop=[
-      ...BASE_CATALOG.flatMap(c=>c.items),
+      ...getCatalogForList(list).flatMap(c=>c.items),
       ...cc.flatMap(c=>c.items||[]),
       ...extraItemsFlat
     ];
@@ -4453,6 +4500,8 @@ function bulkConfirmCat(e, lid, catId, catName){
 }
 function buildShop(list){
   if(!list||!list.id||!list.name) return '<div style="padding:1rem;color:var(--muted)">Cargando…</div>';
+  const isPagos=list._tpl==='tpl-pagos';
+  const activeCatalog=getCatalogForList(list);
   const s=list.shopping=list.shopping||{};
   // ── Coerción defensiva: corrige datos corruptos que lleguen de Supabase ──
   if(!s.checked||Array.isArray(s.checked))s.checked={};
@@ -4475,7 +4524,7 @@ function buildShop(list){
   // ── Poblar inventario con catálogo base la primera vez ──
   const existingIds=new Set(s.inventoryItems.map(i=>i.id));
   const deletedIds=new Set(s.deletedInvIds||[]);
-  BASE_CATALOG.forEach(cat=>cat.items.forEach(item=>{
+  activeCatalog.forEach(cat=>cat.items.forEach(item=>{
     if(deletedIds.has(item.id)) return; // eliminado manualmente — no restaurar
     if(!existingIds.has(item.id)){
       s.inventoryItems.push({id:item.id,name:item.name,stores:item.stores,baseCatId:cat.id});
@@ -4528,14 +4577,14 @@ function buildShop(list){
   <div class="panel-hdr">
     <div class="panel-title">
       <h2>${list.icon} ${esc(list.name)}</h2>
-      <p>${invEnCasa} de ${invTotal} artículos en casa · ${pctFinal}%</p>
+      <p>${invEnCasa} de ${invTotal} ${isPagos?'servicio':'artículo'}${invTotal!==1?'s':''} ${isPagos?'al día':'en casa'} · ${pctFinal}%</p>
     </div>
-    <button class="reset-btn" onclick="resetShop('${list.id}')">↺ Nueva compra</button>
+    <button class="reset-btn" onclick="resetShop('${list.id}')">${isPagos?'🔄 Limpiar lista':'↺ Nueva compra'}</button>
   </div>
   <div class="prog-wrap"><div class="prog-fill" style="width:${pctFinal}%"></div></div>
   <div class="shop-filter-bar">
-    <button class="sfb f-all   ${flt==='all'  ?'active':''}" onclick="setFlt('${list.id}','all')">🏠 Todos <span class="n">${pendAll}</span></button>
-    ${[
+    <button class="sfb f-all   ${flt==='all'  ?'active':''}" onclick="setFlt('${list.id}','all')">${isPagos?'💳':'🏠'} Todos <span class="n">${pendAll}</span></button>
+    ${isPagos?'':[
       {key:'pali', cls:'f-pali', icon:'🏪', name:'Pali',          cnt:sc.pali},
       {key:'verd', cls:'f-verd', icon:'🥬', name:'Verdulería',    cnt:sc.verd},
       {key:'carn', cls:'f-carn', icon:'🥩', name:'Carnicería',    cnt:sc.carn},
@@ -4550,13 +4599,13 @@ function buildShop(list){
       <button class="sfb-del-empty" onclick="hideBuiltinFilter(event,'${list.id}','${st.key}')" title="Ocultar del filtro">✕</button>
     </span>`).join('')}
     ${csBtns}
-    <button class="sfb f-add" onclick="toggleSAdd(event,'${list.id}')">＋ Tienda</button>
+    <button class="sfb f-add" onclick="toggleSAdd(event,'${list.id}')">＋ ${isPagos?'Medio de pago':'Tienda'}</button>
     <div class="store-inline ${saOpen?'open':''}" id="sa-${list.id}">
-      <input type="text" id="si-${list.id}" placeholder="Nombre de la tienda…" maxlength="40"
+      <input type="text" id="si-${list.id}" placeholder="${isPagos?'Medio de pago…':'Nombre de la tienda…'}" maxlength="40"
         onkeydown="if(event.key==='Enter') confSAdd('${list.id}');if(event.key==='Escape') toggleSAdd(event,'${list.id}')">
       <button class="sai-ok" onclick="confSAdd('${list.id}')">Agregar</button>
       <button class="sai-no" onclick="toggleSAdd(event,'${list.id}')">Cancelar</button>
-      ${(s.hiddenFilters||[]).length?`<button class="sai-no" onclick="restoreFilters('${list.id}')" style="background:rgba(74,96,122,.1);border-color:rgba(74,96,122,.3)">↺ Restaurar ocultas</button>`:''}
+      ${(!isPagos&&(s.hiddenFilters||[]).length)?`<button class="sai-no" onclick="restoreFilters('${list.id}')" style="background:rgba(74,96,122,.1);border-color:rgba(74,96,122,.3)">↺ Restaurar ocultas</button>`:''}
     </div>
   </div>
   <div class="shop-cats">`;
@@ -4581,17 +4630,17 @@ function buildShop(list){
 
   html+=`<div class="shop-cat pending-section" style="border-color:rgba(74,96,122,.25);margin-bottom:.5rem">
     <div class="shop-cat-hdr" style="background:rgba(74,96,122,.06);cursor:default">
-      <span class="cat-ico">🛍</span>
-      <span class="cat-name" style="font-weight:700">Compras pendientes</span>
-      <span class="cat-prog" style="background:rgba(74,96,122,.1);color:var(--tc)">${filteredPending.length} artículo${filteredPending.length!==1?'s':''}</span>
+      <span class="cat-ico">${isPagos?'💳':'🛍'}</span>
+      <span class="cat-name" style="font-weight:700">${isPagos?'Pagos pendientes':'Compras pendientes'}</span>
+      <span class="cat-prog" style="background:rgba(74,96,122,.1);color:var(--tc)">${filteredPending.length} ${isPagos?'servicio':'artículo'}${filteredPending.length!==1?'s':''}</span>
     </div>`;
 
   if(filteredPending.length===0){
-    html+=`<div style="padding:.9rem 1rem;color:var(--muted);font-size:.84rem;text-align:center">Sin compras pendientes ✓</div>`;
+    html+=`<div style="padding:.9rem 1rem;color:var(--muted);font-size:.84rem;text-align:center">${isPagos?'Sin pagos pendientes ✓':'Sin compras pendientes ✓'}</div>`;
   } else {
     // Renderizar por categoría
     Object.entries(pendingByCat).forEach(([catId,items])=>{
-      const baseCat=BASE_CATALOG.find(c=>c.id===catId);
+      const baseCat=activeCatalog.find(c=>c.id===catId);
       const customCat=s.customCats?.find(c=>c.id===catId);
       const catIcon=baseCat?.icon||customCat?.icon||'📦';
       const catDisplayName=(s.catNames||{})[catId]||(baseCat?.name||customCat?.name||'Otros');
@@ -4680,15 +4729,15 @@ function buildShop(list){
 
   html+=`<div class="shop-cat inv-cat ${invCollapsed?'collapsed':''}" style="border-color:rgba(74,96,122,.3);margin-top:.2rem">
     <div class="shop-cat-hdr" onclick="toggleCat('${list.id}','_inv')" style="background:rgba(74,96,122,.06)">
-      <span class="cat-ico">📦</span>
-      <span class="cat-name" style="font-weight:700">Inventario</span>
-      <span class="cat-prog" style="background:rgba(74,96,122,.1);color:var(--tc)">${s.inventoryItems.length} artículo${s.inventoryItems.length!==1?'s':''}</span>
+      <span class="cat-ico">${isPagos?'💳':'📦'}</span>
+      <span class="cat-name" style="font-weight:700">${isPagos?'Servicios':'Inventario'}</span>
+      <span class="cat-prog" style="background:rgba(74,96,122,.1);color:var(--tc)">${s.inventoryItems.length} ${isPagos?'servicio':'artículo'}${s.inventoryItems.length!==1?'s':''}</span>
       <span class="cat-arr">▾</span>
     </div>
     <div class="shop-cat-body">
       ${invHTML}
       <div class="cat-inline-add" style="margin-top:.4rem">
-        <input type="text" id="inv-inp-${list.id}" placeholder="Agregar artículo al inventario…" maxlength="80"
+        <input type="text" id="inv-inp-${list.id}" placeholder="${isPagos?'Agregar servicio…':'Agregar artículo al inventario…'}" maxlength="80"
           onkeydown="if(event.key==='Enter'){invAddItem('${list.id}',this.value);this.value=''}">
         <button onclick="invAddItem('${list.id}',document.getElementById('inv-inp-${list.id}').value);document.getElementById('inv-inp-${list.id}').value=''">＋</button>
       </div>
@@ -4804,13 +4853,14 @@ function shopItemHTML(item,list,flt,isCustom,catId){
     </div>`;
   }).join('')+`</div>`:'';
   // el form de agregar: solo visible cuando subOpen===true
+  const isPagosList=list._tpl==='tpl-pagos';
   const addFormHTML=subOpen?`
     <div class="sub-add-form">
-      <input class="inp-tipo" type="text" id="st-${lid}-${item.id}" placeholder="Tipo (ej: Chuleta)" maxlength="50"
+      <input class="inp-tipo" type="text" id="st-${lid}-${item.id}" placeholder="${isPagosList?'Concepto':'Tipo (ej: Chuleta)'}" maxlength="50"
         onkeydown="if(event.key==='Enter') addSub(event,'${lid}','${item.id}','${esc(item.name)}')">
-      <input class="inp-s" type="text" id="sm-${lid}-${item.id}" placeholder="Marca" maxlength="40"
+      <input class="inp-s" type="text" id="sm-${lid}-${item.id}" placeholder="${isPagosList?'Proveedor':'Marca'}" maxlength="40"
         onkeydown="if(event.key==='Enter') addSub(event,'${lid}','${item.id}','${esc(item.name)}')">
-      <input class="inp-s" type="text" id="sc-${lid}-${item.id}" placeholder="Cantidad" maxlength="30"
+      <input class="inp-s" type="${isPagosList?'number':'text'}" id="sc-${lid}-${item.id}" placeholder="${isPagosList?'Monto':'Cantidad'}" maxlength="30" ${isPagosList?'min="0" step="any"':''}
         onkeydown="if(event.key==='Enter') addSub(event,'${lid}','${item.id}','${esc(item.name)}')">
       <button onclick="addSub(event,'${lid}','${item.id}','${esc(item.name)}')">＋ Agregar</button>
     </div>`:'';
@@ -4866,7 +4916,7 @@ function shopItemHTML(item,list,flt,isCustom,catId){
       </div>
 
       <button class="note-btn ${itemNote?'has-note':''}" title="${itemNote?'Ver/editar nota':'Agregar nota'}" onclick="toggleNote(event,'item','${lid}','${item.id}')">📝</button>
-      <button class="sub-toggle-btn ${subOpen?'open':''}" title="Tipo · Marca · Cantidad"
+      <button class="sub-toggle-btn ${subOpen?'open':''}" title="${isPagosList?'Concepto · Proveedor · Monto':'Tipo · Marca · Cantidad'}"
         onclick="toggleSub(event,'${lid}','${item.id}')">＋</button>
     </div>
     ${itemNoteOpen?itemNoteHTML:''}
@@ -5123,7 +5173,7 @@ function openBulkCat(e,lid,catId,catType){
   const chk=s.checked||{};
   let items=[];
   if(catType==='bcat'){
-    const cat=BASE_CATALOG.find(c=>c.id===catId);
+    const cat=getCatalogForList(list).find(c=>c.id===catId);
     const extra=(s.extraItems||{})[catId]||[];
     items=[...(cat?.items||[]),...extra];
   } else {
@@ -5133,7 +5183,7 @@ function openBulkCat(e,lid,catId,catType){
   const pending=items.filter(i=>!hiddenItems.has(i.id)&&!chk[i.id]?.bought);
   _bulk={lid,catId,catType,pendingIds:pending.map(i=>i.id),pendingItems:pending};
   const catName=catType==='bcat'
-    ?(BASE_CATALOG.find(c=>c.id===catId)?.name||catId)
+    ?(getCatalogForList(list).find(c=>c.id===catId)?.name||catId)
     :((Array.isArray(s.customCats)?s.customCats:[]).find(c=>c.id===catId)?.name||catId);
   document.getElementById('bulk-cat-title').textContent=`${catName} — ${pending.length} artículo${pending.length!==1?'s':''} pendiente${pending.length!==1?'s':''}`;
   openModal('modal-bulk-cat');
@@ -5259,7 +5309,7 @@ function openSubBuyConfirm(lid,itemId,subId){
   const label=parts.join(' · ')||'Sub-ítem';
   // Construir lista de tiendas igual que openBuyConfirm
   const builtinStoreNames={pali:'Pali',verd:'Verdulería',carn:'Carnicería',pmm:'Pequeño Mundo',mayca:'MAYCA',pric:'Pricemart'};
-  const item=BASE_CATALOG.flatMap(c=>[...c.items,...((list.shopping.extraItems||{})[c.id]||[])]).find(i=>i.id===itemId)
+  const item=getCatalogForList(list).flatMap(c=>[...c.items,...((list.shopping.extraItems||{})[c.id]||[])]).find(i=>i.id===itemId)
     || list.shopping.inventoryItems?.find(i=>i.id===itemId);
   const hiddenForItem=list.shopping.hiddenStores?.[itemId]||[];
   const builtinStores=(item?.stores||[]).filter(sid=>!hiddenForItem.includes(sid)).map(sid=>({id:sid,name:builtinStoreNames[sid]||sid}));
@@ -5347,7 +5397,7 @@ function subMbcConfirm(){
 }
 function openBuyConfirm(lid,itemId,itemName,list){
   const builtinStoreNames={pali:'Pali',verd:'Verdulería',carn:'Carnicería',pmm:'Pequeño Mundo',mayca:'MAYCA',pric:'Pricemart'};
-  const item=BASE_CATALOG.flatMap(c=>[...c.items,...((list.shopping.extraItems||{})[c.id]||[])]).find(i=>i.id===itemId)
+  const item=getCatalogForList(list).flatMap(c=>[...c.items,...((list.shopping.extraItems||{})[c.id]||[])]).find(i=>i.id===itemId)
     || list.shopping.customCats?.flatMap(c=>c.items||[]).find(i=>i.id===itemId);
   // 1. tiendas builtin del catálogo — excluyendo las que el usuario ocultó
   const hiddenForItem=list.shopping.hiddenStores?.[itemId]||[];
@@ -6982,7 +7032,16 @@ function doConfirm(){
 
 
 // ══════════════════════ PLANTILLAS DE LISTAS ══════════════════════
-const LIST_TEMPLATES = [];
+const LIST_TEMPLATES = [
+  {id:'tpl-pagos', name:'Pagos y Servicios', icon:'💳', type:'shopping',
+   color:'#4A7A8C', desc:'Gestión de pagos y servicios del hogar',
+   factory:()=>({tasks:[], shopping:{
+     inventoryItems:[], checked:{}, customCats:[], customStores:[],
+     inventoryPending:{}, subItems:{}, subBought:{}, itemCosts:{}, subItemCosts:{},
+     itemStores:{}, hiddenStores:{}, catNotes:{}, itemNotes:{}, catNames:{},
+     extraItems:{}, hiddenFilters:[], deletedInvIds:[]
+   }})}
+];
 
 function openNewListModal(){
   if(!isAdmin())return;
