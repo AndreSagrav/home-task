@@ -4649,8 +4649,14 @@ function buildShop(list){
       const collapsed=catCol[list.id+'_'+catId]===true;
 
       const catItemIds=items.map(i=>i.id).join(',');
-      // Total de costos de esta categoría (para Pagos y Servicios)
-      const catTotal=isPagos?items.reduce((sum,item)=>sum+(parseFloat(s.itemCosts?.[item.id])||0),0):0;
+      // Total de costos de esta categoría (itemCosts + subItemCosts de sus sub-ítems)
+      const catTotal=isPagos?items.reduce((sum,item)=>{
+        const direct=parseFloat(s.itemCosts?.[item.id])||0;
+        const subTotal=Object.entries(s.subItemCosts||{})
+          .filter(([sid])=>(s.subItems?.[item.id]||[]).some(sub=>sub.id===sid))
+          .reduce((ss,[,v])=>ss+(parseFloat(v?.price||v)||0),0);
+        return sum+direct+subTotal;
+      },0):0;
       const fmtCRC=n=>'₡'+Math.round(n).toLocaleString('es-CR');
       html+=`<div class="shop-sub-cat ${collapsed?'collapsed':''}">
         <div class="shop-sub-cat-hdr" onclick="toggleCat('${list.id}','${catId}')">
@@ -4684,7 +4690,8 @@ function buildShop(list){
 
   // ── TOTAL — entre compras pendientes e inventario ──
   const allCosts=Object.values(s.itemCosts||{}).map(v=>parseFloat(v)||0).filter(v=>v>0);
-  const grandTotal=allCosts.reduce((sum,v)=>sum+v,0);
+  const allSubCosts=Object.values(s.subItemCosts||{}).map(v=>parseFloat(v?.price||v)||0).filter(v=>v>0);
+  const grandTotal=[...allCosts,...allSubCosts].reduce((sum,v)=>sum+v,0);
   if(grandTotal>0){
     const shopSplit=s.shopSplit||1;
     const fmtCRC=n=>'₡'+Math.round(n).toLocaleString('es-CR');
@@ -4822,6 +4829,10 @@ function shopItemHTML(item,list,flt,isCustom,catId){
     const boughtPrice=sBought?.price||'';
     const boughtCurr=sBought?.curr||'CRC';
     const priceStr=boughtPrice?(boughtCurr==='CRC'?'₡':'$')+Number(boughtPrice).toLocaleString('es-CR'):'';
+    // Etiquetas según tipo de lista
+    const tipoLabel=isPagosList?(s.tipo?`<span class="st">${esc(s.tipo)}</span>`:''):(s.tipo?`<span class="st">${esc(s.tipo)}</span>`:'');
+    const marcaLabel=isPagosList?(s.marca?`<span class="sc">🏢 ${esc(s.marca)}</span>`:''):(s.marca?`<span class="sc">${esc(s.marca)}</span>`:'');
+    const cantLabel=isPagosList?(s.cant?`<span class="sub-cost">₡${Number(s.cant).toLocaleString('es-CR')}</span>`:''):(s.cant?`<span class="sc">${esc(s.cant)}</span>`:'');
     return `<div class="sub-item-row ${sBought?'sub-bought':''}" style="flex-wrap:wrap">
       <div class="sub-chk ${sBought?'checked':''}"
         onclick="event.stopPropagation();${sBought?`unsubBuy('${lid}','${item.id}','${s.id}')`:`openSubBuyConfirm('${lid}','${item.id}','${s.id}')`}"
@@ -4831,10 +4842,7 @@ function shopItemHTML(item,list,flt,isCustom,catId){
         ${sBought?'<svg width="10" height="8" viewBox="0 0 10 8"><polyline points="1,4 4,7 9,1" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/></svg>':''}
       </div>
       <div class="sub-txt" style="${sBought?'text-decoration:line-through;opacity:.55':''}">
-        ${[s.tipo&&`<span class="st">${esc(s.tipo)}</span>`,
-           s.marca&&`<span class="sc">${esc(s.marca)}</span>`,
-           s.cant&&`<span class="sc">${esc(s.cant)}</span>`]
-          .filter(Boolean).join('<span style="color:var(--sand);margin:0 .15rem">·</span>')}
+        ${[tipoLabel,marcaLabel,cantLabel].filter(Boolean).join('<span style="color:var(--sand);margin:0 .15rem">·</span>')}
         ${snHasNote&&!snOpen?`<span style="font-size:.72rem;color:var(--muted);margin-left:.3rem">📝 ${esc(snVal)}</span>`:''}
         ${sBought?`<span style="font-size:.68rem;color:var(--muted);margin-left:.35rem">${boughtStore?esc(boughtStore)+' · ':''}${priceStr?priceStr+' · ':''}${boughtTs}</span>`:''}
       </div>
@@ -5300,23 +5308,30 @@ function unsubBuy(lid,itemId,subId){
   saveUD(list.id); rebuildPanel(lid);
 }
 function openSubBuyConfirm(lid,itemId,subId){
-  if(!CU)return; // no autenticado
+  if(!CU)return;
   const list=UD.lists.find(l=>l.id===lid);
   if(!list)return;
   const subBought=list.shopping.subBought||{};
-  // Si ya está comprado, no hacer nada (solo el padre puede desmarcar)
   if(subBought[subId])return;
   const subs=list.shopping.subItems?.[itemId]||[];
   const sub=subs.find(s=>s.id===subId);
   if(!sub)return;
+  const isPagos=list._tpl==='tpl-pagos';
   const parts=[sub.tipo,sub.marca,sub.cant].filter(Boolean);
   const label=parts.join(' · ')||'Sub-ítem';
-  // Construir lista de tiendas igual que openBuyConfirm
+  // Adaptar modal según tipo de lista
+  document.getElementById('sub-mbc-title').textContent=isPagos?'💳 Confirmar pago':'🛒 Confirmar sub-ítem';
+  document.getElementById('sub-mbc-price-label').textContent=isPagos?'💳 Monto':'💰 Precio';
+  document.getElementById('sub-mbc-store-label').textContent=isPagos?'💳 ¿CON QUÉ MEDIO DE PAGO?':'🏪 ¿DÓNDE COMPRASTE?';
+  document.getElementById('sub-mbc-tipo').placeholder=isPagos?'Concepto':'Tipo';
+  document.getElementById('sub-mbc-marca').placeholder=isPagos?'Proveedor':'Marca';
+  document.getElementById('sub-mbc-cant').placeholder=isPagos?'Monto':'Cantidad';
+  // Construir lista de medios de pago / tiendas
   const builtinStoreNames={pali:'Pali',verd:'Verdulería',carn:'Carnicería',pmm:'Pequeño Mundo',mayca:'MAYCA',pric:'Pricemart'};
   const item=getCatalogForList(list).flatMap(c=>[...c.items,...((list.shopping.extraItems||{})[c.id]||[])]).find(i=>i.id===itemId)
     || list.shopping.inventoryItems?.find(i=>i.id===itemId);
   const hiddenForItem=list.shopping.hiddenStores?.[itemId]||[];
-  const builtinStores=(item?.stores||[]).filter(sid=>!hiddenForItem.includes(sid)).map(sid=>({id:sid,name:builtinStoreNames[sid]||sid}));
+  const builtinStores=isPagos?[]:(item?.stores||[]).filter(sid=>!hiddenForItem.includes(sid)).map(sid=>({id:sid,name:builtinStoreNames[sid]||sid}));
   const globalCustom=(list.shopping.customStores||[]).map(s=>({id:s.id,name:s.name}));
   const perItem=(list.shopping.itemStores?.[itemId]||[]).map(s=>({id:s.id,name:s.name}));
   const seen=new Set();
@@ -5324,12 +5339,10 @@ function openSubBuyConfirm(lid,itemId,subId){
     const k=s.name.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;
   });
   _subMbc={lid,itemId,subId,label,stores:allStores,curr:'CRC',selStore:null};
-  // Populate modal
   document.getElementById('sub-mbc-label').textContent=label;
   document.getElementById('sub-mbc-err').style.display='none';
   document.getElementById('sub-mbc-store-err').style.display='none';
   document.getElementById('sub-mbc-price').value='';
-  // Pre-rellenar tipo/marca/cant con los datos existentes del sub-ítem
   document.getElementById('sub-mbc-tipo').value=sub?.tipo||'';
   document.getElementById('sub-mbc-marca').value=sub?.marca||'';
   document.getElementById('sub-mbc-cant').value=sub?.cant||'';
@@ -5337,7 +5350,7 @@ function openSubBuyConfirm(lid,itemId,subId){
   const stDiv=document.getElementById('sub-mbc-stores');
   stDiv.innerHTML=allStores.length
     ?allStores.map(s=>`<button class="mbc-store-btn" onclick="subMbcSelStore('${s.id}','${esc(s.name)}')" id="smbs-${s.id.replace(/[^a-z0-9]/gi,'')}">${esc(s.name)}</button>`).join('')
-    :`<span style="font-size:.75rem;color:var(--muted)">Sin tiendas configuradas</span>`;
+    :`<span style="font-size:.75rem;color:var(--muted)">${isPagos?'Sin medios de pago configurados — podés omitir':'Sin tiendas configuradas'}</span>`;
   openModal('modal-sub-buy');
   setTimeout(()=>document.getElementById('sub-mbc-price')?.focus(),120);
 }
@@ -8319,10 +8332,10 @@ if(!navigator.onLine) showBanner();
 <!-- ════ SUB-ITEM BUY CONFIRM MODAL ════ -->
 <div class="modal-ov" id="modal-sub-buy">
   <div class="modal-card">
-    <h3 style="margin-bottom:.2rem;font-size:1rem">🛒 Confirmar sub-ítem</h3>
+    <h3 id="sub-mbc-title" style="margin-bottom:.2rem;font-size:1rem">🛒 Confirmar sub-ítem</h3>
     <p id="sub-mbc-label" style="font-size:.88rem;font-weight:600;color:var(--tc);margin:.1rem 0 .8rem"></p>
     <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem">
-      <span style="font-size:.8rem;color:var(--muted);font-weight:600">💰 Precio</span>
+      <span id="sub-mbc-price-label" style="font-size:.8rem;color:var(--muted);font-weight:600">💰 Precio</span>
       <button id="sub-mbc-crc" class="mbc-curr-btn active" onclick="subMbcSetCurr('CRC')">₡</button>
       <button id="sub-mbc-usd" class="mbc-curr-btn" onclick="subMbcSetCurr('USD')">$</button>
     </div>
@@ -8336,10 +8349,10 @@ if(!navigator.onLine) showBanner();
       <input type="text" id="sub-mbc-marca" placeholder="Marca" maxlength="50" class="mbc-detail-inp">
       <input type="text" id="sub-mbc-cant" placeholder="Cantidad" maxlength="40" class="mbc-detail-inp">
     </div>
-    <p id="sub-mbc-err" style="display:none;color:#C05050;font-size:.75rem;margin-bottom:.4rem">Ingresá un precio mayor a 0</p>
-    <div style="font-size:.8rem;font-weight:600;color:var(--muted);margin-bottom:.4rem">🏪 ¿DÓNDE COMPRASTE?</div>
+    <p id="sub-mbc-err" style="display:none;color:#C05050;font-size:.75rem;margin-bottom:.4rem">Ingresá un monto mayor a 0</p>
+    <div id="sub-mbc-store-label" style="font-size:.8rem;font-weight:600;color:var(--muted);margin-bottom:.4rem">🏪 ¿DÓNDE COMPRASTE?</div>
     <div id="sub-mbc-stores" style="display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.5rem"></div>
-    <p id="sub-mbc-store-err" style="display:none;color:#C05050;font-size:.75rem;margin-bottom:.4rem">Seleccioná una tienda</p>
+    <p id="sub-mbc-store-err" style="display:none;color:#C05050;font-size:.75rem;margin-bottom:.4rem">Seleccioná una opción</p>
     <div class="modal-acts" style="margin-top:.6rem">
       <button class="m-cancel" onclick="document.getElementById('modal-sub-buy').classList.remove('open')">Cancelar</button>
       <button class="m-ok" onclick="subMbcConfirm()">✓ Confirmar</button>
