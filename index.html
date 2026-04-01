@@ -4649,12 +4649,22 @@ function buildShop(list){
       const collapsed=catCol[list.id+'_'+catId]===true;
 
       const catItemIds=items.map(i=>i.id).join(',');
-      // Total de costos de esta categoría (itemCosts + subItemCosts de sus sub-ítems)
+      // Helper: monto real de un sub-ítem de pagos (cant) con su split
+      const subMontoPagos=(sub)=>{
+        const raw=parseFloat(sub.cant)||0;
+        const sp=Math.max(1,parseInt(sub.split)||1);
+        return raw/sp;
+      };
+      // Total de costos de esta categoría
       const catTotal=isPagos?items.reduce((sum,item)=>{
         const direct=parseFloat(s.itemCosts?.[item.id])||0;
-        const subTotal=Object.entries(s.subItemCosts||{})
-          .filter(([sid])=>(s.subItems?.[item.id]||[]).some(sub=>sub.id===sid))
-          .reduce((ss,[,v])=>ss+(parseFloat(v?.price||v)||0),0);
+        // sub-ítems: leer de subItemCosts (confirmados) o de cant (ingresados directamente)
+        const itemSubs=s.subItems?.[item.id]||[];
+        const subTotal=itemSubs.reduce((ss,sub)=>{
+          const confirmed=s.subItemCosts?.[sub.id];
+          const val=confirmed?parseFloat(confirmed?.price||confirmed)||0:subMontoPagos(sub);
+          return ss+val;
+        },0);
         return sum+direct+subTotal;
       },0):0;
       const fmtCRC=n=>'₡'+Math.round(n).toLocaleString('es-CR');
@@ -4691,7 +4701,15 @@ function buildShop(list){
   // ── TOTAL — entre compras pendientes e inventario ──
   const allCosts=Object.values(s.itemCosts||{}).map(v=>parseFloat(v)||0).filter(v=>v>0);
   const allSubCosts=Object.values(s.subItemCosts||{}).map(v=>parseFloat(v?.price||v)||0).filter(v=>v>0);
-  const grandTotal=[...allCosts,...allSubCosts].reduce((sum,v)=>sum+v,0);
+  // Para pagos: también sumar montos de sub-ítems ingresados directamente (cant) que no tienen subItemCosts aún
+  const allCantCosts=isPagos?s.inventoryItems.flatMap(item=>{
+    const itemSubs=s.subItems?.[item.id]||[];
+    return itemSubs
+      .filter(sub=>!s.subItemCosts?.[sub.id]) // solo los no confirmados por modal
+      .map(sub=>{ const raw=parseFloat(sub.cant)||0; const sp=Math.max(1,parseInt(sub.split)||1); return raw/sp; })
+      .filter(v=>v>0);
+  }):[];
+  const grandTotal=[...allCosts,...allSubCosts,...allCantCosts].reduce((sum,v)=>sum+v,0);
   if(grandTotal>0){
     const shopSplit=s.shopSplit||1;
     const fmtCRC=n=>'₡'+Math.round(n).toLocaleString('es-CR');
@@ -4833,7 +4851,22 @@ function shopItemHTML(item,list,flt,isCustom,catId){
     // Etiquetas según tipo de lista
     const tipoLabel=isPagosList?(s.tipo?`<span class="st">${esc(s.tipo)}</span>`:''):(s.tipo?`<span class="st">${esc(s.tipo)}</span>`:'');
     const marcaLabel=isPagosList?(s.marca?`<span class="sc">🏢 ${esc(s.marca)}</span>`:''):(s.marca?`<span class="sc">${esc(s.marca)}</span>`:'');
-    const cantLabel=isPagosList?(s.cant?`<span class="sub-cost">₡${Number(s.cant).toLocaleString('es-CR')}</span>`:''):(s.cant?`<span class="sc">${esc(s.cant)}</span>`:'');
+    // Para pagos: monto con split inline
+    const subRaw=isPagosList?(parseFloat(s.cant)||0):0;
+    const subSp=isPagosList?Math.max(1,parseInt(s.split)||1):1;
+    const subPerPerson=subRaw>0?subRaw/subSp:0;
+    const cantLabel=isPagosList?(s.cant?`
+      <span class="sub-cost" style="display:inline-flex;align-items:center;gap:.25rem">
+        ₡${Math.round(subRaw).toLocaleString('es-CR')}
+        <span style="color:var(--muted);font-size:.65rem">÷</span>
+        <span class="pay-split-ctrl" style="border-color:rgba(200,150,60,.35);padding:0 .15rem;gap:.1rem;height:16px"
+          onclick="event.stopPropagation()">
+          <button onclick="event.stopPropagation();setSubSplit('${lid}','${item.id}','${s.id}',${Math.max(1,subSp-1)})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.7rem;padding:0 .1rem;line-height:1">−</button>
+          <span style="font-size:.68rem;min-width:10px;text-align:center">${subSp}</span>
+          <button onclick="event.stopPropagation();setSubSplit('${lid}','${item.id}','${s.id}',${subSp+1})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.7rem;padding:0 .1rem;line-height:1">+</button>
+        </span>
+        ${subSp>1?`<span style="font-size:.68rem;color:var(--sage)">c/u ₡${Math.round(subPerPerson).toLocaleString('es-CR')}</span>`:''}
+      </span>`:''):(s.cant?`<span class="sc">${esc(s.cant)}</span>`:'');
     return `<div class="sub-item-row ${sBought?'sub-bought':''}" style="flex-wrap:wrap">
       <div class="sub-chk ${sBought?'checked':''}"
         onclick="event.stopPropagation();${sBought?`unsubBuy('${lid}','${item.id}','${s.id}')`:`openSubBuyConfirm('${lid}','${item.id}','${s.id}')`}"
@@ -6658,6 +6691,14 @@ function cancelShopItem(lid,itemId){
 function setShopSplit(lid,n){
   const list=UD.lists.find(l=>l.id===lid);
   list.shopping.shopSplit=Math.max(1,n);
+  saveUD(list.id);
+  rebuildPanel(lid);
+}
+function setSubSplit(lid,itemId,subId,n){
+  const list=UD.lists.find(l=>l.id===lid); if(!list)return;
+  const subs=list.shopping.subItems?.[itemId]||[];
+  const sub=subs.find(s=>s.id===subId); if(!sub)return;
+  sub.split=Math.max(1,n);
   saveUD(list.id);
   rebuildPanel(lid);
 }
