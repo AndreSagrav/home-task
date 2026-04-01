@@ -4661,21 +4661,14 @@ function buildShop(list){
       const collapsed=catCol[list.id+'_'+catId]===true;
 
       const catItemIds=items.map(i=>i.id).join(',');
-      // Helper: monto real de un sub-ítem de pagos (cant) con su split
-      const subMontoPagos=(sub)=>{
-        const raw=parseFloat(sub.cant)||0;
-        const sp=Math.max(1,parseInt(sub.split)||1);
-        return raw/sp;
-      };
-      // Total de costos de esta categoría
+      // Total BRUTO de esta categoría (sin dividir por split)
       const catTotal=isPagos?items.reduce((sum,item)=>{
         const direct=parseFloat(s.itemCosts?.[item.id])||0;
-        // sub-ítems: leer de subItemCosts (confirmados) o de cant (ingresados directamente)
         const itemSubs=s.subItems?.[item.id]||[];
         const subTotal=itemSubs.reduce((ss,sub)=>{
           const confirmed=s.subItemCosts?.[sub.id];
-          const val=confirmed?parseFloat(confirmed?.price||confirmed)||0:subMontoPagos(sub);
-          return ss+val;
+          const val=confirmed?parseFloat(confirmed?.price||confirmed)||0:(parseFloat(sub.cant)||0);
+          return ss+val; // siempre el monto bruto, no dividido
         },0);
         return sum+direct+subTotal;
       },0):0;
@@ -4713,12 +4706,12 @@ function buildShop(list){
   // ── TOTAL — entre compras pendientes e inventario ──
   const allCosts=Object.values(s.itemCosts||{}).map(v=>parseFloat(v)||0).filter(v=>v>0);
   const allSubCosts=Object.values(s.subItemCosts||{}).map(v=>parseFloat(v?.price||v)||0).filter(v=>v>0);
-  // Para pagos: también sumar montos de sub-ítems ingresados directamente (cant) que no tienen subItemCosts aún
+  // Para pagos: sumar montos BRUTOS (sin dividir por split) de sub-ítems directos
   const allCantCosts=isPagos?s.inventoryItems.flatMap(item=>{
     const itemSubs=s.subItems?.[item.id]||[];
     return itemSubs
-      .filter(sub=>!s.subItemCosts?.[sub.id]) // solo los no confirmados por modal
-      .map(sub=>{ const raw=parseFloat(sub.cant)||0; const sp=Math.max(1,parseInt(sub.split)||1); return raw/sp; })
+      .filter(sub=>!s.subItemCosts?.[sub.id])
+      .map(sub=>parseFloat(sub.cant)||0) // monto bruto, sin dividir
       .filter(v=>v>0);
   }):[];
   const grandTotal=[...allCosts,...allSubCosts,...allCantCosts].reduce((sum,v)=>sum+v,0);
@@ -4734,7 +4727,7 @@ function buildShop(list){
         <span>${shopSplit}</span>
         <button onclick="setShopSplit('${list.id}',${shopSplit+1});event.stopPropagation()">+</button>
       </div>
-      ${shopSplit>1?`<span class="st-per">c/u ${fmtCRC(grandTotal/shopSplit)}</span>`:''}
+      <span class="st-per">c/u ${fmtCRC(grandTotal/shopSplit)}</span>
       <button class="st-clear" onclick="clearAllCosts('${list.id}')">${isPagos?'🗑 Borrar montos':'🗑 Borrar precios'}</button>
     </div>`;
   }
