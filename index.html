@@ -573,6 +573,21 @@ main{max-width:1100px;margin:0 auto;padding:2rem 1.6rem;}
 /* Split control: altura y alineación vertical */
 .pay-split-ctrl{display:inline-flex;align-items:center;gap:.15rem;border:1.5px solid var(--sand);
   border-radius:20px;padding:.1rem .35rem;background:var(--bg-card);height:22px;}
+/* Botones del split: color visible en dark mode */
+.pay-split-ctrl button{background:none;border:none;cursor:pointer;color:var(--muted);font-size:.78rem;
+  padding:0 .15rem;line-height:1;font-family:'Montserrat',sans-serif;}
+.pay-split-ctrl button:hover{color:var(--tc);}
+.pay-split-ctrl span{color:var(--text);font-size:.72rem;min-width:12px;text-align:center;}
+/* Todos los headers de secciones: alineación vertical centrada uniforme */
+.shop-cat-hdr,.shop-sub-cat-hdr,.shop-filter-bar{align-items:center;}
+/* Padding horizontal uniforme 1rem en todos los niveles */
+.shop-cat-hdr{padding:.85rem 1rem;}
+.shop-sub-cat-hdr{padding:.85rem 1rem;min-height:auto;}
+.shop-item{padding:.65rem 1rem;}
+.shop-cat-body .cat-inline-add{padding:0 1rem .65rem;}
+/* Sub-items: sin indent excesivo */
+.sub-items-section{padding:.2rem 1rem .5rem 1rem !important;}
+.sub-item-row{padding:.3rem .2rem;gap:.45rem;}
 
 /* ── ITEM COST ── */
 .item-cost-display{display:inline-flex;align-items:center;gap:.2rem;}
@@ -4719,7 +4734,7 @@ function buildShop(list){
     const shopSplit=s.shopSplit||1;
     const fmtCRC=n=>'₡'+Math.round(n).toLocaleString('es-CR');
     html+=`<div class="shop-total-bar" style="margin-bottom:1rem">
-      <span class="st-label">${isPagos?'💳 Total mensual':'🧾 Total compra'}</span>
+      <span class="st-label">${isPagos?'💳 Total acumulado':'🧾 Total compra'}</span>
       <span class="st-amount">${fmtCRC(grandTotal)}</span>
       <span class="st-div">÷</span>
       <div class="pay-split-ctrl" style="border-color:rgba(200,150,60,.35)">
@@ -4864,13 +4879,13 @@ function shopItemHTML(item,list,flt,isCustom,catId){
       <span class="sub-cost" style="display:inline-flex;align-items:center;gap:.25rem;flex-wrap:wrap">
         <span>₡${Math.round(subRaw).toLocaleString('es-CR')}</span>
         <span style="color:var(--muted);font-size:.65rem">÷</span>
-        <span class="pay-split-ctrl" style="border-color:rgba(200,150,60,.35);padding:0 .15rem;gap:.1rem;height:18px"
+        <span class="pay-split-ctrl" style="border-color:rgba(200,150,60,.35);padding:0 .3rem;gap:.15rem;height:20px;background:rgba(212,150,60,.08)"
           onclick="event.stopPropagation()">
-          <button onclick="event.stopPropagation();setSubSplit('${lid}','${item.id}','${s.id}',${Math.max(1,subSp-1)})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.72rem;padding:0 .1rem;line-height:1">−</button>
-          <span style="font-size:.7rem;min-width:10px;text-align:center;color:var(--text)">${subSp}</span>
-          <button onclick="event.stopPropagation();setSubSplit('${lid}','${item.id}','${s.id}',${subSp+1})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.72rem;padding:0 .1rem;line-height:1">+</button>
+          <button onclick="event.stopPropagation();setSubSplit('${lid}','${item.id}','${s.id}',${Math.max(1,subSp-1)})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;padding:0 .1rem;line-height:1;font-family:'Montserrat',sans-serif">−</button>
+          <span style="font-size:.72rem;min-width:12px;text-align:center;color:var(--text);font-weight:600">${subSp}</span>
+          <button onclick="event.stopPropagation();setSubSplit('${lid}','${item.id}','${s.id}',${subSp+1})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;padding:0 .1rem;line-height:1;font-family:'Montserrat',sans-serif">+</button>
         </span>
-        <span style="font-size:.7rem;color:var(--sage);font-weight:600">c/u ₡${Math.round(subPerPerson).toLocaleString('es-CR')}</span>
+        <span style="font-size:.72rem;color:var(--sage);font-weight:600;white-space:nowrap">c/u ₡${Math.round(subPerPerson).toLocaleString('es-CR')}</span>
       </span>`:''):(s.cant?`<span class="sc">${esc(s.cant)}</span>`:'');
     return `<div class="sub-item-row ${sBought?'sub-bought':''}" style="flex-wrap:wrap">
       <div class="sub-chk ${sBought?'checked':''}"
@@ -4961,7 +4976,8 @@ function shopItemHTML(item,list,flt,isCustom,catId){
       <div class="shop-chk">${chkSVG}</div>
       <div class="shop-ibody">
         <span class="shop-iname">${esc(item.name)}${subs.length?` <span style="font-size:.65rem;color:var(--sage);font-weight:500">(${subs.length})</span>`:''}</span>
-        <div class="shop-imeta">${badges}${custBadge}${itemStoreBadgesHTML}${who}${badgeAddSection}</div>
+        ${!isPagosList?`<div class="shop-imeta">${badges}${custBadge}${itemStoreBadgesHTML}${who}${badgeAddSection}</div>`
+          :(who?`<div class="shop-imeta">${who}</div>`:'')}
         ${itemNote&&!itemNoteOpen?`<div class="note-display">${esc(itemNote)}</div>`:''}
       </div>
 
