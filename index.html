@@ -562,6 +562,18 @@ main{max-width:1100px;margin:0 auto;padding:2rem 1.6rem;}
 .cat-note.carn{background:var(--b-carn);color:var(--c-carn);border-color:var(--br-carn);}
 .cat-prog{font-size:.7rem;color:var(--muted);background:var(--warm);padding:.09rem .42rem;border-radius:20px;white-space:nowrap;flex-shrink:0;}
 
+/* ── PAGOS Y SERVICIOS — padding y alineación uniformes ── */
+/* Panel principal */
+.list-panel .panel-hdr{padding:.9rem 1rem;}
+.list-panel .prog-wrap{margin-left:0;margin-right:0;}
+/* Sub-ítems de pagos: padding horizontal consistente */
+.sub-items-section{padding:.24rem 1rem .5rem 1rem;}
+/* Sub-item row: alineación vertical centrada */
+.sub-item-row{display:flex;align-items:center;gap:.5rem;padding:.3rem 0;}
+/* Split control: altura y alineación vertical */
+.pay-split-ctrl{display:inline-flex;align-items:center;gap:.15rem;border:1.5px solid var(--sand);
+  border-radius:20px;padding:.1rem .35rem;background:var(--bg-card);height:22px;}
+
 /* ── ITEM COST ── */
 .item-cost-display{display:inline-flex;align-items:center;gap:.2rem;}
 .item-cost-inp{width:88px;padding:.2rem .45rem;border:1.5px solid rgba(212,150,60,.4);border-radius:9px;font-size:.74rem;background:var(--bg-card);color:var(--esp);outline:none;}
@@ -4856,16 +4868,16 @@ function shopItemHTML(item,list,flt,isCustom,catId){
     const subSp=isPagosList?Math.max(1,parseInt(s.split)||1):1;
     const subPerPerson=subRaw>0?subRaw/subSp:0;
     const cantLabel=isPagosList?(s.cant?`
-      <span class="sub-cost" style="display:inline-flex;align-items:center;gap:.25rem">
-        ₡${Math.round(subRaw).toLocaleString('es-CR')}
+      <span class="sub-cost" style="display:inline-flex;align-items:center;gap:.25rem;flex-wrap:wrap">
+        <span>₡${Math.round(subRaw).toLocaleString('es-CR')}</span>
         <span style="color:var(--muted);font-size:.65rem">÷</span>
-        <span class="pay-split-ctrl" style="border-color:rgba(200,150,60,.35);padding:0 .15rem;gap:.1rem;height:16px"
+        <span class="pay-split-ctrl" style="border-color:rgba(200,150,60,.35);padding:0 .15rem;gap:.1rem;height:18px"
           onclick="event.stopPropagation()">
-          <button onclick="event.stopPropagation();setSubSplit('${lid}','${item.id}','${s.id}',${Math.max(1,subSp-1)})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.7rem;padding:0 .1rem;line-height:1">−</button>
-          <span style="font-size:.68rem;min-width:10px;text-align:center">${subSp}</span>
-          <button onclick="event.stopPropagation();setSubSplit('${lid}','${item.id}','${s.id}',${subSp+1})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.7rem;padding:0 .1rem;line-height:1">+</button>
+          <button onclick="event.stopPropagation();setSubSplit('${lid}','${item.id}','${s.id}',${Math.max(1,subSp-1)})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.72rem;padding:0 .1rem;line-height:1">−</button>
+          <span style="font-size:.7rem;min-width:10px;text-align:center;color:var(--text)">${subSp}</span>
+          <button onclick="event.stopPropagation();setSubSplit('${lid}','${item.id}','${s.id}',${subSp+1})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.72rem;padding:0 .1rem;line-height:1">+</button>
         </span>
-        ${subSp>1?`<span style="font-size:.68rem;color:var(--sage)">c/u ₡${Math.round(subPerPerson).toLocaleString('es-CR')}</span>`:''}
+        <span style="font-size:.7rem;color:var(--sage);font-weight:600">c/u ₡${Math.round(subPerPerson).toLocaleString('es-CR')}</span>
       </span>`:''):(s.cant?`<span class="sc">${esc(s.cant)}</span>`:'');
     return `<div class="sub-item-row ${sBought?'sub-bought':''}" style="flex-wrap:wrap">
       <div class="sub-chk ${sBought?'checked':''}"
@@ -5441,7 +5453,7 @@ function subMbcConfirm(){
     if(list.shopping.inventoryPending?.[_subMbc.itemId]) delete list.shopping.inventoryPending[_subMbc.itemId];
   }
   saveUD(_subMbc.lid);
-  document.getElementById('modal-sub-buy').classList.remove('open');
+  closeModals();
   rebuildPanel(_subMbc.lid);
   if(document.getElementById('log-panel').classList.contains('open'))renderLog();
 }
@@ -5569,7 +5581,7 @@ function mbcSelStore(id,name){
   document.getElementById('mbc-store-err').style.display='none';
 }
 function mbcCancel(){
-  document.getElementById('modal-buy-confirm').classList.remove('open');
+  closeModals();
 }
 function mbcConfirm(){
   const list=UD.lists.find(l=>l.id===_mbc.lid);
@@ -5580,7 +5592,7 @@ function mbcConfirm(){
     if(list.shopping.itemCosts?.[_mbc.itemId]) delete list.shopping.itemCosts[_mbc.itemId];
     logAction('skip',{task:_mbc.itemName,list:list.name});
     saveUD(list.id);
-    document.getElementById('modal-buy-confirm').classList.remove('open');
+    closeModals();
     rebuildPanel(list.id);
     if(document.getElementById('log-panel').classList.contains('open'))renderLog();
     return;
@@ -5634,7 +5646,7 @@ function mbcConfirm(){
     : [{listId:list.id,itemId:_mbc.itemId,itemName:_mbc.itemName,
         price:prices[0].price,currency:_mbc.curr,store:_mbc.selStore?.name||null}];
   savePurchaseHistory(histEntries);
-  document.getElementById('modal-buy-confirm').classList.remove('open');
+  closeModals();
   renderAll(_mbc?.lid||null);
   if(document.getElementById('log-panel').classList.contains('open'))renderLog();
 }
@@ -7197,6 +7209,7 @@ function closeModals(){
   document.body.style.top='';
   document.body.style.width='';
   if(_scrollY) window.scrollTo(0,_scrollY);
+  _scrollY=0;
 }
 document.querySelectorAll('.modal-ov').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModals();}));
 
@@ -7205,6 +7218,11 @@ let _scrollY=0;
 function openModal(id){
   const el=document.getElementById(id);
   if(!el)return;
+  // Limpiar estado anterior antes de abrir (evita body atrapado en fixed)
+  document.body.style.overflow='';
+  document.body.style.position='';
+  document.body.style.top='';
+  document.body.style.width='';
   el.classList.add('open');
   // Bloquear scroll iOS sin romper el scroll al cerrar
   if(window.innerWidth<=640){
@@ -8395,7 +8413,7 @@ if(!navigator.onLine) showBanner();
     <div id="sub-mbc-stores" style="display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.5rem"></div>
     <p id="sub-mbc-store-err" style="display:none;color:#C05050;font-size:.75rem;margin-bottom:.4rem">Seleccioná una opción</p>
     <div class="modal-acts" style="margin-top:.6rem">
-      <button class="m-cancel" onclick="document.getElementById('modal-sub-buy').classList.remove('open')">Cancelar</button>
+      <button class="m-cancel" onclick="closeModals()">Cancelar</button>
       <button class="m-ok" onclick="subMbcConfirm()">✓ Confirmar</button>
     </div>
   </div>
