@@ -4816,6 +4816,7 @@ function shopItemHTML(item,list,flt,isCustom,catId){
   if(bought&&st.who)who=`<span class="who-bought"><span class="av av-xs" style="background:${st.color}">${st.who[0].toUpperCase()}</span>${esc(st.who)} · ${fmtTime(st.ts)}</span>`;
   const subs=list.shopping.subItems[item.id]||[];
   const subOpen=subItemOpen[lid+'_'+item.id]===true;
+  const isPagosList=list._tpl==='tpl-pagos';
   // sub-items guardados: SIEMPRE visibles independientemente del form
   const subBought=list.shopping.subBought||{};
   const subsHTML=subs.length?`<div class="sub-items-saved">`+subs.map(s=>{
@@ -4865,7 +4866,6 @@ function shopItemHTML(item,list,flt,isCustom,catId){
     </div>`;
   }).join('')+`</div>`:'';
   // el form de agregar: solo visible cuando subOpen===true
-  const isPagosList=list._tpl==='tpl-pagos';
   const addFormHTML=subOpen?`
     <div class="sub-add-form">
       <input class="inp-tipo" type="text" id="st-${lid}-${item.id}" placeholder="${isPagosList?'Concepto':'Tipo (ej: Chuleta)'}" maxlength="50"
