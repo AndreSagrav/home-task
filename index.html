@@ -4649,13 +4649,17 @@ function buildShop(list){
       const collapsed=catCol[list.id+'_'+catId]===true;
 
       const catItemIds=items.map(i=>i.id).join(',');
+      // Total de costos de esta categoría (para Pagos y Servicios)
+      const catTotal=isPagos?items.reduce((sum,item)=>sum+(parseFloat(s.itemCosts?.[item.id])||0),0):0;
+      const fmtCRC=n=>'₡'+Math.round(n).toLocaleString('es-CR');
       html+=`<div class="shop-sub-cat ${collapsed?'collapsed':''}">
         <div class="shop-sub-cat-hdr" onclick="toggleCat('${list.id}','${catId}')">
           <span class="cat-ico" style="font-size:.9rem">${catIcon}</span>
           <span class="cat-name">${esc(catDisplayName)}</span>
           <span class="cat-prog" style="font-size:.72rem">${items.length}</span>
+          ${isPagos&&catTotal>0?`<span style="font-size:.72rem;font-weight:700;color:var(--gold);background:rgba(212,150,60,.1);border:1px solid rgba(212,150,60,.25);border-radius:10px;padding:.06rem .42rem;white-space:nowrap">${fmtCRC(catTotal)}</span>`:''}
           <button class="note-btn ${catNote?'has-note':''}" onclick="toggleNote(event,'cat','${list.id}','${catId}')">📝</button>
-          <div class="bulk-cat-chk" title="Marcar todos como comprados"
+          <div class="bulk-cat-chk" title="${isPagos?'Marcar todos como pagados':'Marcar todos como comprados'}"
             onclick="event.stopPropagation();bulkConfirmCat(event,'${list.id}','${catId}','${esc(catDisplayName)}')"
             style="width:20px;height:20px;border:2px solid rgba(139,74,40,.35);border-radius:5px;cursor:pointer;
                    flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--tc);font-size:.72rem;
@@ -4685,7 +4689,7 @@ function buildShop(list){
     const shopSplit=s.shopSplit||1;
     const fmtCRC=n=>'₡'+Math.round(n).toLocaleString('es-CR');
     html+=`<div class="shop-total-bar" style="margin-bottom:1rem">
-      <span class="st-label">🧾 Total compra</span>
+      <span class="st-label">${isPagos?'💳 Total mensual':'🧾 Total compra'}</span>
       <span class="st-amount">${fmtCRC(grandTotal)}</span>
       <span class="st-div">÷</span>
       <div class="pay-split-ctrl" style="border-color:rgba(200,150,60,.35)">
@@ -4694,7 +4698,7 @@ function buildShop(list){
         <button onclick="setShopSplit('${list.id}',${shopSplit+1});event.stopPropagation()">+</button>
       </div>
       ${shopSplit>1?`<span class="st-per">c/u ${fmtCRC(grandTotal/shopSplit)}</span>`:''}
-      <button class="st-clear" onclick="clearAllCosts('${list.id}')">🗑 Borrar precios</button>
+      <button class="st-clear" onclick="clearAllCosts('${list.id}')">${isPagos?'🗑 Borrar montos':'🗑 Borrar precios'}</button>
     </div>`;
   }
 
