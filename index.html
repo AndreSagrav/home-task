@@ -6096,8 +6096,22 @@ let _cartItems={};  // {lid:[{cartId,itemId,itemName,prices,subItems,curr,selSto
 let _facturas=[];   // cache local de facturas
 
 function getCart(lid){return _cartItems[lid]||(_cartItems[lid]=[]);}
-function saveCart(lid){try{localStorage.setItem('mh_cart_'+lid,JSON.stringify(_cartItems[lid]||[]));}catch(e){}}
-function loadCart(lid){try{const d=localStorage.getItem('mh_cart_'+lid);if(d)_cartItems[lid]=JSON.parse(d);}catch(e){}}
+function saveCart(lid){
+  const list=UD.lists.find(l=>l.id===lid);
+  if(list){
+    if(!list.shopping)list.shopping={};
+    list.shopping._cartItems=_cartItems[lid]||[];
+    saveUD(lid);
+  }
+}
+function loadCart(lid){
+  const list=UD.lists.find(l=>l.id===lid);
+  if(list&&list.shopping&&Array.isArray(list.shopping._cartItems)){
+    _cartItems[lid]=list.shopping._cartItems;
+  }else{
+    _cartItems[lid]=_cartItems[lid]||[];
+  }
+}
 function cartCount(lid){return getCart(lid).length;}
 function cartTotal(lid){
   const curr={CRC:0,USD:0};
