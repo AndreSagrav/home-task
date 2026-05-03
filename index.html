@@ -4243,14 +4243,9 @@ async function doChangePassword(){
 // ══════════════════════ HOUSES ══════════════════════
 async function goToHousesScreen(){
   if(!CU)return goToHome();
-  // Verificar que el perfil todavía existe en Supabase (solo si hay conexión)
-  if(navigator.onLine){
-    try{
-      const {data,error}=await sb.from('profiles').select('id').eq('id',CU.id).maybeSingle();
-      // Solo cerrar sesión si Supabase respondió exitosamente y confirmó que no existe
-      if(!error && data===null){ doLogout(); return; }
-    }catch(e){ /* error de red — continuar con sesión local */ }
-  }
+  // No forzar logout automático aunque Supabase devuelva vacío —
+  // puede ser RLS, red intermitente o race con propagación de sesión.
+  // Si el perfil realmente no existe, las demás queries fallarán visiblemente.
   renderHousesScreen();showScreen('s-houses');
   await loadMyHousesFromSupabase();
   // Cargar casas donde CU es admin (para gating del panel admin)
