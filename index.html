@@ -2174,6 +2174,24 @@ function isHouseAdminCached(code){
   return !!(code && _myAdminHouses && _myAdminHouses.has(code));
 }
 function hasAnyAdminHouse(){ return isAdmin() || (_myAdminHouses && _myAdminHouses.size>0); }
+// Garantiza que el creador de la casa quede como admin (para casas antiguas sin role)
+async function ensureHouseAdmin(code){
+  if(!CU||!code||isAdmin()) return;
+  try{
+    const {data:hm}=await sb.from('house_members').select('role').eq('profile_id',CU.id).eq('house_code',code).maybeSingle();
+    if(hm?.role==='admin'){
+      if(!_myAdminHouses) _myAdminHouses=new Set();
+      _myAdminHouses.add(code);
+      return;
+    }
+    const {data:house}=await sb.from('houses').select('created_by').eq('code',code).maybeSingle();
+    if(house && house.created_by===CU.id){
+      await sb.from('house_members').upsert({profile_id:CU.id,house_code:code,house_id:code,role:'admin'});
+      if(!_myAdminHouses) _myAdminHouses=new Set();
+      _myAdminHouses.add(code);
+    }
+  }catch(e){console.warn('ensureHouseAdmin:',e.message);}
+}
 // Scope del panel admin actual: 'global' (superadmin) | 'house' (admin de casa)
 let _adminScope='global';
 
@@ -3151,12 +3169,15 @@ function getHouseData(shareCode){
     const oldRaw=localStorage.getItem(prefix+shareCode);
     if(oldRaw){try{const oldData=JSON.parse(oldRaw);localStorage.setItem(K_HOUSE_DATA(shareCode),JSON.stringify(oldData));localStorage.removeItem(prefix+shareCode);return oldData;}catch(e){}}
   }
-  // Casa nueva — estructura por defecto
-  const sid=uid();
+  // Casa nueva — estructura por defecto (2 listas: Compras + Pagos y Servicios)
+  const sid=uid(); // compras
+  const pid=uid(); // pagos
   return{
     lists:[
       {id:sid,name:'Compras del Hogar',icon:'🛒',type:'shopping',tasks:[],
        shopping:{checked:{},customCats:[],subItems:{},customStores:[],itemStores:{},extraItems:{},hiddenStores:{},catNotes:{},itemNotes:{},catNames:{},itemCosts:{},shopSplit:1}},
+      {id:pid,name:'Pagos y Servicios',icon:'💳',type:'shopping',_tpl:'tpl-pagos',tasks:[],
+       shopping:{inventoryItems:[],checked:{},customCats:[],customStores:[],inventoryPending:{},subItems:{},subBought:{},itemCosts:{},subItemCosts:{},itemStores:{},hiddenStores:{},catNotes:{},itemNotes:{},catNames:{},extraItems:{},hiddenFilters:[],deletedInvIds:{}}},
     ],
     activeListId:sid,
     meta:{razonSocial:'',destinatario:''}
@@ -4166,19 +4187,23 @@ function openProfileModal(){
   document.getElementById('pm-err').style.display='none';
   document.getElementById('pm-ok').style.display='none';
   // Visible si superadmin, o si está dentro de una casa donde es admin
-  const _showAdminBtn = isAdmin() || (CH && isHouseAdminCached(CH.shareCode));
-  document.getElementById('admin-btn-wrap').style.display=_showAdminBtn?'block':'none';
-  const _statsWrap=document.getElementById('admin-stats-btn-wrap');
-  if(_statsWrap) _statsWrap.style.display=_showAdminBtn?'block':'none';
-  // Estado notificaciones push
-  const pushBtn=document.getElementById('push-notif-btn');
+  const _updateAdminBtn = ()=>{
+    const show = isAdmin() || (CH && isHouseAdminCached(CH.shareCode));
+    document.getElementById('admin-btn-wrap').style.display=show?'block':'none';
+    const sw=document.getElementById('admin-stats-btn-wrap');
+    if(sw) sw.style.display=show?'block':'none';
+  };
+  _updateAdminBtn();
+  // Si el cache aún no se cargó, cargar y reaplicar visibilidad
+  if(!_myAdminHouses && CH){
+    loadMyAdminHouses().then(()=>ensureHouseAdmin(CH.shareCode)).then(_updateAdminBtn).catch(()=>{});
+  }
   const pushLabel=document.getElementById('push-notif-label');
   if(!('Notification' in window)||!('PushManager' in window)){
     if(pushBtn) pushBtn.style.display='none';
   } else {
     const perm=Notification.permission;
     if(pushLabel) pushLabel.textContent=perm==='granted'?'Notificaciones activadas ✓':perm==='denied'?'Notificaciones bloqueadas':'Activar notificaciones';
-    if(pushBtn) pushBtn.style.opacity=perm==='denied'?'.5':'1';
   }
   openModal('modal-profile');
   setTimeout(()=>document.getElementById('pm-pass-old').focus(),150);
@@ -4328,6 +4353,9 @@ function renderHousesScreen(){
 async function enterHouse(house){
   CH=house;
   CH.id=CH.shareCode;
+  // Asegurar cache de casas administradas antes de mostrar UI (para botón admin)
+  if(!_myAdminHouses) loadMyAdminHouses().catch(()=>{});
+  ensureHouseAdmin(CH.shareCode).catch(()=>{});
 
   // Mostrar la app inmediatamente con caché local (si hay)
   UD=getHouseData(CH.shareCode);
