@@ -29,8 +29,9 @@
     ],
     display_override:['standalone','minimal-ui']
   };
-  const blob=new Blob([JSON.stringify(m)],{type:'application/json'});
-  document.getElementById('pwa-manifest').href=URL.createObjectURL(blob);
+  // Safari iOS maneja mejor data: URLs que blob: para manifest
+  const json=JSON.stringify(m);
+  document.getElementById('pwa-manifest').href='data:application/manifest+json;charset=utf-8,'+encodeURIComponent(json);
 })();
 </script>
 <title>Mi Hogar</title>
@@ -10132,6 +10133,8 @@ renderHome();
 <script>
 // ── Error visible en pantalla para debug móvil ──
 window.onerror=function(msg,src,line,col,err){
+  // Ignorar errores CORS (scripts de CDN) — vienen sin detalles y no son accionables
+  if((!msg||msg==='Script error.'||msg==='Script error')&&!err&&(!src||line===0)) return false;
   const div=document.getElementById('_dbg')||document.createElement('div');
   div.id='_dbg';
   div.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#C05050;color:white;font-size:.7rem;padding:.5rem;z-index:99999;max-height:40vh;overflow:auto;word-break:break-all';
