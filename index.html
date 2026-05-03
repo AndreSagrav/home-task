@@ -2153,6 +2153,29 @@ body{line-height:1.6;}
 const ADMIN_EMAILS=['batisvar@gmail.com']; // administradores del sistema
 function isAdmin(){ return CU&&CU.email&&ADMIN_EMAILS.includes(CU.email.toLowerCase()); }
 
+// ── Admin por casa: cache de casas donde CU tiene role='admin' ──
+let _myAdminHouses=null; // Set<string> | null (null = no cargado)
+async function loadMyAdminHouses(){
+  if(!CU){_myAdminHouses=new Set();return _myAdminHouses;}
+  try{
+    const {data,error}=await sb.from('house_members')
+      .select('house_code').eq('profile_id',CU.id).eq('role','admin');
+    if(error)throw error;
+    _myAdminHouses=new Set((data||[]).map(r=>r.house_code).filter(Boolean));
+  }catch(e){
+    console.warn('loadMyAdminHouses:',e.message);
+    if(!_myAdminHouses) _myAdminHouses=new Set();
+  }
+  return _myAdminHouses;
+}
+function isHouseAdminCached(code){
+  if(isAdmin()) return true;
+  return !!(code && _myAdminHouses && _myAdminHouses.has(code));
+}
+function hasAnyAdminHouse(){ return isAdmin() || (_myAdminHouses && _myAdminHouses.size>0); }
+// Scope del panel admin actual: 'global' (superadmin) | 'house' (admin de casa)
+let _adminScope='global';
+
 const SUPA_URL='https://chrslplxjzfjnfvvazgu.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNocnNscGx4anpmam5mdnZhemd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2Nzc3OTcsImV4cCI6MjA4ODI1Mzc5N30.09_90M7rtJ12KeQcbipt_ohR2_uJoT1UsylddWD6rno';
 const sb=supabase.createClient(SUPA_URL,SUPA_KEY,{
@@ -3029,12 +3052,15 @@ function getMyHouses(profileId){
   return [];
 }
 // ── house_members: insert seguro sin upsert (evita error de constraint) ──
-async function syncHouseMember(profileId, houseCode, houseId){
+async function syncHouseMember(profileId, houseCode, houseId, role){
   try{
     const {data:existing}=await sb.from('house_members')
-      .select('id').eq('profile_id',profileId).eq('house_code',houseCode).maybeSingle();
+      .select('id,role').eq('profile_id',profileId).eq('house_code',houseCode).maybeSingle();
     if(existing){
-      await sb.from('house_members').update({house_id:houseId||houseCode,joined_at:new Date().toISOString()})
+      // No degradar role existente; solo promover a admin si se pide explícitamente
+      const upd={house_id:houseId||houseCode,joined_at:new Date().toISOString()};
+      if(role==='admin' && existing.role!=='admin') upd.role='admin';
+      await sb.from('house_members').update(upd)
         .eq('profile_id',profileId).eq('house_code',houseCode);
     } else {
       await sb.from('house_members').insert({
@@ -3042,7 +3068,8 @@ async function syncHouseMember(profileId, houseCode, houseId){
         profile_id:profileId,
         house_id:houseId||houseCode,
         house_code:houseCode,
-        joined_at:new Date().toISOString()
+        joined_at:new Date().toISOString(),
+        role: role||'member'
       });
     }
   }catch(e){console.warn('syncHouseMember:',e.message);}
@@ -4121,6 +4148,7 @@ function doLogout(){
     stopPresence();
     stopRealtimeSync();
     CU=null;CH=null;UD=null;
+    _myAdminHouses=null;
     closeModals();
     await renderHome();
   },'Cerrar sesión');
@@ -4136,7 +4164,11 @@ function openProfileModal(){
   ['pm-pass-old','pm-pass-new','pm-pass-new2'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('pm-err').style.display='none';
   document.getElementById('pm-ok').style.display='none';
-  document.getElementById('admin-btn-wrap').style.display=isAdmin()?'block':'none';
+  // Visible si superadmin, o si está dentro de una casa donde es admin
+  const _showAdminBtn = isAdmin() || (CH && isHouseAdminCached(CH.shareCode));
+  document.getElementById('admin-btn-wrap').style.display=_showAdminBtn?'block':'none';
+  const _statsWrap=document.getElementById('admin-stats-btn-wrap');
+  if(_statsWrap) _statsWrap.style.display=_showAdminBtn?'block':'none';
   // Estado notificaciones push
   const pushBtn=document.getElementById('push-notif-btn');
   const pushLabel=document.getElementById('push-notif-label');
@@ -4220,6 +4252,8 @@ async function goToHousesScreen(){
   }
   renderHousesScreen();showScreen('s-houses');
   await loadMyHousesFromSupabase();
+  // Cargar casas donde CU es admin (para gating del panel admin)
+  loadMyAdminHouses().catch(()=>{});
   renderHousesScreen();
 }
 
@@ -5033,9 +5067,12 @@ async function confirmNewHouse(){
   // crear casa en Supabase y registrar membresía
   (async()=>{
     try{
-      await sb.from('houses').upsert({id:houseId,name,icon:selHouseEmoji,code:pendingNewHouseCode},{onConflict:'id'});
-      // Registrar membresía del creador
-      await syncHouseMember(CU.id, pendingNewHouseCode, houseId);
+      await sb.from('houses').upsert({id:houseId,name,icon:selHouseEmoji,code:pendingNewHouseCode,created_by:CU.id},{onConflict:'id'});
+      // Registrar membresía del creador como admin de la casa
+      await syncHouseMember(CU.id, pendingNewHouseCode, houseId, 'admin');
+      // Refrescar cache local de casas administradas
+      if(_myAdminHouses) _myAdminHouses.add(pendingNewHouseCode);
+      else { _myAdminHouses=new Set([pendingNewHouseCode]); }
       CH={shareCode:pendingNewHouseCode,name,icon:selHouseEmoji,id:houseId};
       UD=getHouseData(pendingNewHouseCode);
       syncToSupabase();
@@ -8955,15 +8992,43 @@ function openModal(id){
 // ══════════════════════ ADMIN PANEL ══════════════════════
 var _adminTab = 'users';
 
-function openAdminPanel(){
-  if(!isAdmin()){alert('Acceso denegado');return;}
+async function openAdminPanel(){
+  // Determinar scope:
+  //  - 'global' si superadmin (vos, batisvar)
+  //  - 'house'  si está dentro de una casa donde es admin
+  //  - denegar  si no es ni una ni otra
+  if(isAdmin()){
+    _adminScope='global';
+  } else {
+    if(!_myAdminHouses) await loadMyAdminHouses();
+    if(CH && isHouseAdminCached(CH.shareCode)){
+      _adminScope='house';
+    } else {
+      alert('Acceso denegado. Para administrar una casa, abrila primero.');
+      return;
+    }
+  }
   showScreen('s-admin');
   document.getElementById('s-admin').style.display='block';
+  // Ajustes UI según scope
+  const subEl=document.querySelector('#s-admin .ap-sub');
+  const ghostBtn=document.querySelector('#s-admin .ap-ghost-btn');
+  const tabAdmins=document.getElementById('atab-admins');
+  if(_adminScope==='house'){
+    if(subEl) subEl.textContent=`🏠 Admin de "${CH?.name||CH?.shareCode||'tu casa'}"`;
+    if(ghostBtn) ghostBtn.style.display='none';
+    if(tabAdmins) tabAdmins.style.display='none';
+  } else {
+    if(subEl) subEl.textContent='🛡️ Superadmin · todas las casas';
+    if(ghostBtn) ghostBtn.style.display='';
+    if(tabAdmins) tabAdmins.style.display='';
+  }
   adminTab('users');
 }
 
 function closeAdminPanel(){
   document.getElementById('s-admin').style.display='none';
+  _adminScope='global';
   // Volver a donde estaba
   if(CH) showScreen('s-app');
   else if(CU){ renderHousesScreen(); showScreen('s-houses'); }
@@ -8971,6 +9036,8 @@ function closeAdminPanel(){
 }
 
 function adminTab(tab){
+  // Bloquear tab 'admins' fuera de scope global
+  if(tab==='admins' && _adminScope!=='global') tab='users';
   _adminTab=tab;
   ['users','houses','history','export','cleanup','admins','stats'].forEach(t=>{
     const btn=document.getElementById('atab-'+t);
@@ -8992,10 +9059,21 @@ async function adminLoadUsers(){
   const count=document.getElementById('admin-users-count');
   list.innerHTML='<p style="color:var(--muted);font-size:.85rem">Cargando…</p>';
   try{
-    const {data,error}=await sb.from('profiles').select('id,name,email,color').order('name');
+    const scopeHouse = _adminScope==='house' ? CH?.shareCode : null;
+    let usersQ=sb.from('profiles').select('id,name,email,color').order('name');
+    let allowedIds=null;
+    if(scopeHouse){
+      const {data:hm}=await sb.from('house_members').select('profile_id').eq('house_code',scopeHouse);
+      allowedIds=new Set((hm||[]).map(r=>r.profile_id));
+      if(allowedIds.size===0){ list.innerHTML='<p style="color:var(--muted);font-size:.85rem">Sin miembros en esta casa.</p>';count.textContent='0 miembros';return; }
+      usersQ=usersQ.in('id',[...allowedIds]);
+    }
+    const {data,error}=await usersQ;
     if(error)throw error;
     // Separado para no perder datos si falla uno
-    const {data:members}=await sb.from('house_members').select('profile_id,house_code');
+    let mq=sb.from('house_members').select('profile_id,house_code');
+    if(scopeHouse) mq=mq.eq('house_code',scopeHouse);
+    const {data:members}=await mq;
     // Contar casas por perfil
     const houseCounts={};
     (members||[]).forEach(m=>{
@@ -9003,7 +9081,7 @@ async function adminLoadUsers(){
       if(!houseCounts[m.profile_id])houseCounts[m.profile_id]=new Set();
       houseCounts[m.profile_id].add(m.house_code);
     });
-    count.textContent=`${data.length} usuarios registrados`;
+    count.textContent=scopeHouse?`${data.length} miembro(s) de esta casa`:`${data.length} usuarios registrados`;
     list.innerHTML=data.map(u=>{
       const hCount=houseCounts[u.id]?.size||0;
       const isAdm=ADMIN_EMAILS.includes((u.email||'').toLowerCase());
@@ -9056,11 +9134,18 @@ async function adminLoadHouses(){
   const count=document.getElementById('admin-houses-count');
   list.innerHTML='<p style="color:var(--muted);font-size:.85rem">Cargando…</p>';
   try{
-    const {data:houses,error}=await sb.from('houses').select('id,name,code,icon').order('name');
+    const scopeHouse = _adminScope==='house' ? CH?.shareCode : null;
+    let hq=sb.from('houses').select('id,name,code,icon').order('name');
+    if(scopeHouse) hq=hq.eq('code',scopeHouse);
+    const {data:houses,error}=await hq;
     if(error)throw error;
-    const {data:members}=await sb.from('house_members').select('house_code,profile_id');
-    const {data:lists}=await sb.from('lists').select('house_id,name');
-    count.textContent=`${houses.length} casas registradas`;
+    let mq=sb.from('house_members').select('house_code,profile_id');
+    if(scopeHouse) mq=mq.eq('house_code',scopeHouse);
+    const {data:members}=await mq;
+    let lq=sb.from('lists').select('house_id,name');
+    if(scopeHouse) lq=lq.eq('house_id',scopeHouse);
+    const {data:lists}=await lq;
+    count.textContent=scopeHouse?`Casa actual`:`${houses.length} casas registradas`;
     list.innerHTML=houses.map(h=>{
       const hMembers=(members||[]).filter(m=>m.house_code===h.code);
       const hLists=(lists||[]).filter(l=>l.house_id===h.code);
@@ -9327,11 +9412,13 @@ async function adminLoadHistory(){
   const countEl=document.getElementById('admin-history-count');
   listEl.innerHTML='<p style="color:var(--muted);font-size:.85rem">Cargando…</p>';
   try{
-    const {data,error}=await sb.from('purchase_history')
-      .select('*').order('bought_at',{ascending:false}).limit(500);
+    const scopeHouse = _adminScope==='house' ? CH?.shareCode : null;
+    let q=sb.from('purchase_history').select('*').order('bought_at',{ascending:false}).limit(500);
+    if(scopeHouse) q=q.eq('house_id',scopeHouse);
+    const {data,error}=await q;
     if(error)throw error;
     _allHistory=data||[];
-    countEl.textContent=`${_allHistory.length} compras registradas`;
+    countEl.textContent=scopeHouse?`${_allHistory.length} compras de esta casa`:`${_allHistory.length} compras registradas`;
     if(_histView==='records') adminRenderHistoryRecords(_allHistory);
     else adminRenderHistory(_allHistory);
   }catch(e){
@@ -9391,11 +9478,18 @@ async function adminDeleteHistoryRecord(id){
 }
 
 async function adminDeleteAllHistory(){
-  openConfirmModal('¿Eliminar TODO el historial?','Esta acción no se puede deshacer.',async()=>{
+  const scopeHouse = _adminScope==='house' ? CH?.shareCode : null;
+  const msg = scopeHouse
+    ? `¿Eliminar TODO el historial de "${CH?.name||scopeHouse}"?`
+    : '¿Eliminar TODO el historial?';
+  openConfirmModal(msg,'Esta acción no se puede deshacer.',async()=>{
     try{
-      await sb.from('purchase_history').delete().neq('id','__none__');
+      let q=sb.from('purchase_history').delete();
+      if(scopeHouse) q=q.eq('house_id',scopeHouse);
+      else q=q.neq('id','__none__');
+      await q;
       _allHistory=[];
-      document.getElementById('admin-history-count').textContent='0 compras registradas';
+      document.getElementById('admin-history-count').textContent=scopeHouse?'0 compras de esta casa':'0 compras registradas';
       document.getElementById('admin-history-list').innerHTML='<p style="color:var(--muted);font-size:.85rem">Historial limpiado.</p>';
     }catch(e){alert('Error: '+e.message);}
   });
@@ -9408,16 +9502,24 @@ async function adminLoadCleanup(){
   const houseEl=document.getElementById('admin-cleanup-house');
   listEl.innerHTML='<p style="color:var(--muted);font-size:.85rem">Cargando...</p>';
   try{
-    const {data,error}=await sb.from('activity_log')
-      .select('*').order('ts',{ascending:false}).limit(1000);
+    const scopeHouse = _adminScope==='house' ? CH?.shareCode : null;
+    let q=sb.from('activity_log').select('*').order('ts',{ascending:false}).limit(1000);
+    if(scopeHouse) q=q.eq('house_id',scopeHouse);
+    const {data,error}=await q;
     if(error)throw error;
     _allLog=data||[];
-    countEl.textContent=`${_allLog.length} registros de actividad`;
-    // Llenar selector de casas
-    const houses=[...new Set(_allLog.map(r=>r.house_id).filter(Boolean))];
-    const currentVal=houseEl.value;
-    houseEl.innerHTML='<option value="">Todas las casas</option>'+
-      houses.map(h=>`<option value="${h}" ${currentVal===h?'selected':''}>${h}</option>`).join('');
+    countEl.textContent=scopeHouse?`${_allLog.length} registros de esta casa`:`${_allLog.length} registros de actividad`;
+    if(scopeHouse){
+      // Bloquear selector a la casa actual
+      houseEl.innerHTML=`<option value="${scopeHouse}" selected>${scopeHouse}</option>`;
+      houseEl.disabled=true;
+    } else {
+      houseEl.disabled=false;
+      const houses=[...new Set(_allLog.map(r=>r.house_id).filter(Boolean))];
+      const currentVal=houseEl.value;
+      houseEl.innerHTML='<option value="">Todas las casas</option>'+
+        houses.map(h=>`<option value="${h}" ${currentVal===h?'selected':''}>${h}</option>`).join('');
+    }
     adminRenderCleanup(_allLog);
   }catch(e){
     listEl.innerHTML=`<p style="color:#C05050;font-size:.85rem">Error: ${e.message}</p>`;
@@ -10000,7 +10102,9 @@ renderHome();
       <div id="admin-btn-wrap" style="display:none">
         <button class="btn" style="background:#1a1a2e;color:#e0c060;border:1.5px solid #4a4a6e;font-size:.85rem;padding:.5rem;width:100%" onclick="closeModals();openAdminPanel()">⚙️ Panel de Administrador</button>
       </div>
-      <button class="btn" style="background:var(--warm);color:var(--text);border:1.5px solid var(--sand);font-size:.85rem;padding:.5rem" onclick="closeModals();openAdminPanel();adminTab('stats')">📈 Estadísticas</button>
+      <div id="admin-stats-btn-wrap" style="display:none">
+        <button class="btn" style="background:var(--warm);color:var(--text);border:1.5px solid var(--sand);font-size:.85rem;padding:.5rem;width:100%" onclick="closeModals();openAdminPanel();adminTab('stats')">📈 Estadísticas</button>
+      </div>
       <button class="btn" style="background:var(--warm);color:var(--text);border:1.5px solid var(--sand);font-size:.85rem;padding:.5rem" onclick="closeModals();goToHouses()">🏠 Casas</button>
       <button class="btn" style="background:#fff0ee;color:#C05040;border:1.5px solid #e8c0b8;font-size:.85rem;padding:.5rem" onclick="doLogout()">🚪 Cerrar sesión</button>
       <button class="btn" style="background:#f0f4ff;color:#4060C0;border:1.5px solid #c0ccee;font-size:.85rem;padding:.5rem" onclick="clearLocalCache()">🔄 Limpiar caché local</button>
