@@ -5658,7 +5658,7 @@ function shopItemHTML(item,list,flt,isCustom,catId){
   const itemStores=list.shopping.itemStores[item.id]||[];
   const itemStoreBadges=itemStores
     .filter(s=>flt==='all'||s.name.toLowerCase()===flt.toLowerCase()||s.id===flt)
-    .map(s=>`<span class="sbadge sb-icust">🏪 ${esc(s.name)}</span>`).join('');
+    .map(s=>`<span class="sbadge sb-icust">🏪 ${esc(s.name)}<span class="sx" onclick="delItemStore(event,'${lid}','${item.id}','${s.id}')">✕</span></span>`).join('');
   const baOpen=badgeAddOpen[lid+'_'+item.id]===true;
   // Picker de sugerencias de tienda (8 fijas, excluyendo catalogo y ya agregadas)
   const allAvailableStores=Object.entries(STORES).map(([key,s])=>({id:key,name:s.name,icon:s.icon}));
