@@ -9555,7 +9555,19 @@ async function openPurchaseHistory(todayOnly=false){
   bg.style.display='block';
   document.getElementById('hist-list').innerHTML='<p style="color:var(--muted);font-size:.85rem;padding:.5rem 0">Cargando…</p>';
   document.getElementById('hist-summary').textContent='';
-  if(!CH)return;
+  if(!CH){
+    try{
+      const houses=getMyHouses(CU?.id);
+      if(houses?.length===1){
+        enterHouse(houses[0]);
+        await new Promise(r=>setTimeout(r,120));
+      }
+    }catch(_){ }
+    if(!CH){
+      document.getElementById('hist-list').innerHTML='<p style="color:#C05050;font-size:.85rem">No hay casa cargada. Entra a tu casa para ver el historial.</p>';
+      return;
+    }
+  }
   try{
     // Reintentar enviar pendientes antes de leer
     await flushPendingHistory();
