@@ -5432,14 +5432,9 @@ function buildShop(list){
       {key:'panaderia',cls:'f-panaderia',icon:'🍞',name:'Panadería',cnt:sc.panaderia},
       {key:'farmacia',cls:'f-farmacia',icon:'💊',name:'Farmacia',cnt:sc.farmacia},
       {key:'hogar',cls:'f-hogar',icon:'🔧',name:'Hogar/Ferretería',cnt:sc.hogar},
-    ].filter(st=>!(Array.isArray(s.hiddenFilters)?s.hiddenFilters:[]).includes(st.key))
-     .map(st=>`<span style="display:inline-flex;align-items:center;gap:0">
-      <button class="sfb ${st.cls} ${flt===st.key?'active':''}" onclick="setFlt('${list.id}','${st.key}')">
+    ].map(st=>`<button class="sfb ${st.cls} ${flt===st.key?'active':''}" onclick="setFlt('${list.id}','${st.key}')">
         ${st.icon} ${st.name} <span class="n">${st.cnt}</span>
-      </button>
-      <button class="sfb-del-empty" onclick="hideBuiltinFilter(event,'${list.id}','${st.key}')" title="Ocultar del filtro">✕</button>
-    </span>`).join('')}
-    ${(!isPagos&&(s.hiddenFilters||[]).length)?`<button class="sai-no" onclick="restoreFilters('${list.id}')" style="background:rgba(74,96,122,.1);border-color:rgba(74,96,122,.3);font-size:.75rem;padding:.25rem .5rem">↺ Restaurar ocultas</button>`:''}
+      </button>`).join('')}
   </div>
   <div class="shop-cats">`;
 
