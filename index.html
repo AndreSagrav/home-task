@@ -4396,6 +4396,11 @@ function renderHousesScreen(){
   // Mostrar banner de limpieza si el admin tiene más de 1 casa (puede haber fantasmas)
   const ghostWrap = document.getElementById('admin-ghost-clean-wrap');
   if(ghostWrap) ghostWrap.style.display = (isAdmin() && houses.length > 1) ? 'block' : 'none';
+
+  // Si solo hay una casa, entrar automáticamente para evitar quedarse sin CH
+  if(houses.length===1){
+    setTimeout(()=>{ enterHouse(houses[0]); },10);
+  }
 }
 
 async function enterHouse(house){
