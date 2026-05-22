@@ -9635,13 +9635,15 @@ async function openPurchaseHistory(todayOnly=true){
         .limit(200);
       factRowsRemote=facturaHistoryEntries(factHours,factData||[]).map(r=>({...r,__factura:true}));
     }catch(_){/*silencio*/}
-    let merged=[...(data||[]),...pending,...factRowsLocal,...factRowsRemote]
-      .sort((a,b)=>new Date(b.bought_at||b.ts||0)-new Date(a.bought_at||a.ts||0));
-    // Si sigue vacío (p.ej. offline y sin facturas), usar log de actividad reciente
-    if(merged.length===0){
-      const act=activityHistoryEntries(factHours);
-      merged=[...act].sort((a,b)=>new Date(b.bought_at||b.ts||0)-new Date(a.bought_at||a.ts||0));
-    }
+    // Actividad reciente (compras/pagos) como respaldo siempre visible
+    const actRows=activityHistoryEntries(factHours);
+    // Combinar todo y deduplicar por id
+    const mergedMap=new Map();
+    [...(data||[]),...pending,...factRowsLocal,...factRowsRemote,...actRows].forEach(r=>{
+      if(!r||!r.id) return;
+      if(!mergedMap.has(r.id)) mergedMap.set(r.id,r);
+    });
+    const merged=[...mergedMap.values()].sort((a,b)=>new Date(b.bought_at||b.ts||0)-new Date(a.bought_at||a.ts||0));
     const summaryLabel = todayOnly ? 'Últimas 24h (incl. facturas locales/remotas)' : 'Últimas compras';
     _histData=merged;
     renderPurchaseHistory(_histData);
