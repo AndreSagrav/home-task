@@ -2355,6 +2355,29 @@ async function savePurchaseHistory(entries){
   console.warn('savePurchaseHistory falló tras 3 intentos:',lastErr?.message);
 }
 
+// Reintenta enviar pendientes del historial guardados localmente
+async function flushPendingHistory(){
+  if(!CH)return;
+  const backupKey='mh_hist_pending_'+CH.shareCode;
+  let pending=[];
+  try{ pending=JSON.parse(localStorage.getItem(backupKey)||'[]'); }catch(_){ pending=[]; }
+  if(!pending.length) return;
+  try{
+    const {error}=await sb.from('purchase_history').insert(pending);
+    if(!error){ try{ localStorage.removeItem(backupKey); }catch(_){ } }
+  }catch(e){
+    console.warn('flushPendingHistory:',e.message);
+  }
+}
+
+function getPendingHistory(){
+  if(!CH)return [];
+  const backupKey='mh_hist_pending_'+CH.shareCode;
+  try{
+    return JSON.parse(localStorage.getItem(backupKey)||'[]').map(r=>({...r,__pending:true}));
+  }catch(_){ return []; }
+}
+
 // ══════════════════════ EMAILJS CONFIG ══════════════════════
 // Para activar correos reales:
 // 1. Crea cuenta gratis en https://www.emailjs.com
@@ -9486,16 +9509,27 @@ async function openPurchaseHistory(){
   document.getElementById('hist-summary').textContent='';
   if(!CH)return;
   try{
+    // Reintentar enviar pendientes antes de leer
+    await flushPendingHistory();
     const {data,error}=await sb.from('purchase_history')
       .select('*')
       .eq('house_id',CH.shareCode)
       .order('bought_at',{ascending:false})
       .limit(300);
     if(error)throw error;
-    _histData=data||[];
+    // Fusionar con pendientes locales (si existieran por fallas previas)
+    const pending=getPendingHistory();
+    _histData=[...(data||[]),...pending].sort((a,b)=>new Date(b.bought_at||b.ts||0)-new Date(a.bought_at||a.ts||0));
     renderPurchaseHistory(_histData);
   }catch(e){
-    document.getElementById('hist-list').innerHTML=`<p style="color:#C05050;font-size:.85rem">Error: ${e.message}</p>`;
+    const pending=getPendingHistory();
+    if(pending.length){
+      _histData=pending;
+      renderPurchaseHistory(pending);
+      document.getElementById('hist-summary').textContent='Sin conexión. Mostrando pendientes locales no enviados.';
+    } else {
+      document.getElementById('hist-list').innerHTML=`<p style="color:#C05050;font-size:.85rem">Error: ${e.message}</p>`;
+    }
   }
 }
 
@@ -9561,10 +9595,10 @@ function renderPurchaseHistory(rows){
         <div style="flex:1;min-width:0">
           <div style="font-size:.85rem;font-weight:600;color:#EDD8C0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.item_name||'Sin nombre')}</div>
           ${parts.length?`<div style="font-size:.7rem;color:#B89880;margin-top:.1rem">${parts.map(p=>esc(p)).join(' · ')}</div>`:''}
-          ${r.store?`<div style="font-size:.68rem;color:#9A7860;margin-top:.1rem">📍 ${esc(r.store)}</div>`:''}
+          ${r.store?`<div style="font-size:.68rem;color:#9A7860;margin-top:.1rem">📍 ${esc(r.store)}${r.__pending?' · pendiente de enviar':''}</div>`:''}
         </div>
         <div style="text-align:right;flex-shrink:0">
-          <div style="font-size:.82rem;font-weight:600;color:#E8A878">${curr}${Number(r.price).toLocaleString('es-CR')}</div>
+          <div style="font-size:.82rem;font-weight:600;color:#E8A878">${curr}${Number(r.price).toLocaleString('es-CR')}${r.__pending?' · pend.':''}</div>
           <div style="font-size:.62rem;color:#9A7860;margin-top:.1rem">${esc(r.bought_by||'?')}</div>
         </div>
       </div>`;
