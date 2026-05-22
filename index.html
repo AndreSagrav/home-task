@@ -9512,12 +9512,13 @@ async function openPurchaseHistory(todayOnly=false){
     // Reintentar enviar pendientes antes de leer
     await flushPendingHistory();
     const todayStart=new Date();todayStart.setHours(0,0,0,0);
-    const tomorrow=new Date(todayStart);tomorrow.setDate(tomorrow.getDate()+1);
+    const since24=new Date(Date.now()-24*3600*1000).toISOString();
     let q=sb.from('purchase_history')
       .select('*')
       .eq('house_id',CH.shareCode);
     if(todayOnly){
-      q=q.gte('bought_at',todayStart.toISOString()).lt('bought_at',tomorrow.toISOString()).order('bought_at',{ascending:false});
+      // Ventana últimas 24h para asegurar que aparezcan las compras recientes aunque haya offsets
+      q=q.gte('bought_at',since24).order('bought_at',{ascending:false}).limit(200);
     } else {
       q=q.order('bought_at',{ascending:false}).limit(300);
     }
@@ -9525,22 +9526,8 @@ async function openPurchaseHistory(todayOnly=false){
     if(error)throw error;
     // Fusionar con pendientes locales (si existieran por fallas previas)
     const pending=getPendingHistory();
-    let merged=[...(data||[]),...pending].sort((a,b)=>new Date(b.bought_at||b.ts||0)-new Date(a.bought_at||a.ts||0));
-    // Si se pidió solo hoy y no hay datos, intenta últimas 24h para no dejar vacío
-    let summaryLabel = todayOnly ? 'Hoy' : 'Últimas compras';
-    if(todayOnly && merged.length===0){
-      const since24=new Date(Date.now()-24*3600*1000).toISOString();
-      const {data:dayData,error:dayErr}=await sb.from('purchase_history')
-        .select('*')
-        .eq('house_id',CH.shareCode)
-        .gte('bought_at',since24)
-        .order('bought_at',{ascending:false})
-        .limit(50);
-      if(!dayErr && dayData?.length){
-        merged=[...(dayData||[]),...pending].sort((a,b)=>new Date(b.bought_at||b.ts||0)-new Date(a.bought_at||a.ts||0));
-        summaryLabel='Últimas 24h';
-      }
-    }
+    const merged=[...(data||[]),...pending].sort((a,b)=>new Date(b.bought_at||b.ts||0)-new Date(a.bought_at||a.ts||0));
+    const summaryLabel = todayOnly ? 'Últimas 24h' : 'Últimas compras';
     _histData=merged;
     renderPurchaseHistory(_histData);
     const total=_histData.length;
