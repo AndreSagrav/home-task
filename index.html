@@ -5660,7 +5660,21 @@ function shopItemHTML(item,list,flt,isCustom,catId){
     .filter(s=>flt==='all'||s.name.toLowerCase()===flt.toLowerCase()||s.id===flt)
     .map(s=>`<span class="sbadge sb-icust">🏪 ${esc(s.name)}</span>`).join('');
   const baOpen=badgeAddOpen[lid+'_'+item.id]===true;
-  // Tiendas fijas - no se agregan ni eliminan, vienen del catálogo
+  // Picker de sugerencias de tienda (8 fijas, excluyendo catalogo y ya agregadas)
+  const allAvailableStores=Object.entries(STORES).map(([key,s])=>({id:key,name:s.name,icon:s.icon}));
+  const catalogStoreNames=new Set((item.stores||[]).map(sid=>STORES[sid]?.name?.toLowerCase()).filter(Boolean));
+  const alreadyAddedNames=new Set((list.shopping.itemStores?.[item.id]||[]).map(s=>s.name.toLowerCase()));
+  const pickableStores=allAvailableStores.filter(s=>!catalogStoreNames.has(s.name.toLowerCase())&&!alreadyAddedNames.has(s.name.toLowerCase()));
+  const badgeAddSection=baOpen?`
+    <span class="badge-store-picker" id="ba-${lid}-${item.id}">
+      ${pickableStores.length
+        ?pickableStores.map(s=>`<button class="store-pick-btn" onclick="addItemStore(event,'${lid}','${item.id}','${esc(s.name)}')">${s.icon} ${esc(s.name)}</button>`).join('')
+        :`<span style="font-size:.71rem;color:var(--muted);">Sin tiendas disponibles</span>`
+      }
+      <button class="store-pick-close" onclick="toggleBadgeAdd(event,'${lid}','${item.id}')">✕</button>
+    </span>`
+  :`<button class="badge-add-btn" title="Agregar sugerencia de tienda"
+      onclick="toggleBadgeAdd(event,'${lid}','${item.id}')">＋</button>`;
   let who='';
   if(bought&&st.who)who=`<span class="who-bought"><span class="av av-xs" style="background:${st.color}">${st.who[0].toUpperCase()}</span>${esc(st.who)} · ${fmtTime(st.ts)}</span>`;
   const subs=list.shopping.subItems[item.id]||[];
@@ -5795,7 +5809,7 @@ function shopItemHTML(item,list,flt,isCustom,catId){
       <div class="shop-chk">${chkSVG}</div>
       <div class="shop-ibody">
         <span class="shop-iname">${esc(item.name)}${subs.length?` <span style="font-size:.65rem;color:var(--sage);font-weight:500">(${subs.length})</span>`:''}${itemNoteInline}</span>
-        ${!isPagosList?`<div class="shop-imeta">${badges}${who}</div>`
+        ${!isPagosList?`<div class="shop-imeta">${badges}${itemStoreBadges}${who}${badgeAddSection}</div>`
           :(who?`<div class="shop-imeta">${who}</div>`:'')}
       </div>
 
