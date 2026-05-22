@@ -489,9 +489,12 @@ main{max-width:1100px;margin:0 auto;padding:2rem 1.6rem;}
 .sfb.f-pali.active{background:#5A3E28;}
 .sfb.f-verd.active{background:#1E4A28;}
 .sfb.f-carn.active{background:#5A1E18;}
-.sfb.f-pmm.active{background:#1A3058;}
-.sfb.f-mayca.active{background:#0E3830;}
-.sfb.f-pric.active{background:#3A2058;}
+.sfb.f-superm.active{background:#4A3A20;}
+.sfb.f-minis.active{background:#3A4A50;}
+.sfb.f-feria.active{background:#5A4A30;}
+.sfb.f-panaderia.active{background:#6A5A30;}
+.sfb.f-farmacia.active{background:#3A5A70;}
+.sfb.f-hogar.active{background:#4A4A50;}
 .sfb.f-cs.active{background:#3A2058;}
 .sfb.f-add{border-style:dashed;border-color:rgba(255,255,255,.2);color:#E8D0B8;background:#2A1A10;}
 .sfb.f-add:hover{border-color:var(--tc);background:#3A2418;color:white;}
@@ -621,9 +624,12 @@ main{max-width:1100px;margin:0 auto;padding:2rem 1.6rem;}
 .sb-pali {background:#5A3E28;color:#F5E8D8;border:1.5px solid #7A5438;}
 .sb-verd {background:#1E4A28;color:#C8F0D0;border:1.5px solid #2E6A38;}
 .sb-carn {background:#5A1E18;color:#F5C8C0;border:1.5px solid #7A2E28;}
-.sb-pmm  {background:#1A3058;color:#C0D8F8;border:1.5px solid #2A4878;}
-.sb-mayca{background:#0E3830;color:#A8E8D8;border:1.5px solid #1A5848;}
-.sb-pric {background:#3A2058;color:#D8C8F8;border:1.5px solid #5A3878;}
+.sb-superm{background:#4A3A20;color:#E8D8C0;border:1.5px solid #6A5A40;}
+.sb-minis {background:#3A4A50;color:#C8D8E0;border:1.5px solid #5A6A70;}
+.sb-feria {background:#5A4A30;color:#E8D8C0;border:1.5px solid #7A6A50;}
+.sb-panaderia{background:#6A5A30;color:#F5E8D0;border:1.5px solid #8A7A50;}
+.sb-farmacia{background:#3A5A70;color:#C8E0F0;border:1.5px solid #5A7A90;}
+.sb-hogar {background:#4A4A50;color:#D0D0D8;border:1.5px solid #6A6A70;}
 .sb-cust {background:#3A2058;color:#D8C8F8;border:1.5px solid #5A3878;font-weight:600;}
 .sb-icust{background:#4A2A10;color:#F0D0A0;border:1.5px solid #6A4A28;display:inline-flex;align-items:center;gap:.18rem;font-weight:600;}
 .sb-icust .sx{cursor:pointer;opacity:.6;font-size:.58rem;line-height:1;}
@@ -2380,12 +2386,14 @@ const K_HOUSE_DATA=code=>'mh_house13_'+code;
 const K_LOG='mh_log_v1';
 
 const STORES={
-  pali: {name:'Pali',         icon:'🏪',cls:'sb-pali'},
   verd: {name:'Verdulería',   icon:'🥬',cls:'sb-verd'},
   carn: {name:'Carnicería',   icon:'🥩',cls:'sb-carn'},
-  pmm:  {name:'Pequeño Mundo',icon:'🏬',cls:'sb-pmm'},
-  mayca:{name:'MAYCA',        icon:'🏬',cls:'sb-mayca'},
-  pric: {name:'Pricemart',    icon:'🏬',cls:'sb-pric'},
+  superm: {name:'Supermercado',icon:'🏪',cls:'sb-super'},
+  minis: {name:'MiniSuper',   icon:'🏪',cls:'sb-minis'},
+  feria: {name:'Feria',       icon:'🏟️',cls:'sb-feria'},
+  panaderia: {name:'Panadería',icon:'🍞',cls:'sb-panaderia'},
+  farmacia: {name:'Farmacia',  icon:'💊',cls:'sb-farmacia'},
+  hogar: {name:'Hogar/Ferretería',icon:'🔧',cls:'sb-hogar'},
 };
 
 
@@ -5385,8 +5393,7 @@ function buildShop(list){
   });
 
   // ── Contar pendientes por tienda ──
-  const sc={pali:0,verd:0,carn:0,pmm:0,mayca:0,pric:0};
-  const csc={};customStores.forEach(cs=>{csc[cs.id]=0;});
+  const sc={verd:0,carn:0,superm:0,minis:0,feria:0,panaderia:0,farmacia:0,hogar:0};
   // Contar SIEMPRE sobre todos los pendientes (independiente del filtro activo)
   pendingItems.forEach(item=>{
     (item.stores||['pali']).forEach(store=>{
@@ -5399,17 +5406,6 @@ function buildShop(list){
   const invTotal=s.inventoryItems.length;
   const invEnCasa=s.inventoryItems.filter(i=>chk[i.id]?.bought).length;
   const pctFinal=invTotal?Math.round(invEnCasa/invTotal*100):0;
-
-  const saOpen=shopStoreAddOpen[list.id]||false;
-  const csBtns=customStores.map(cs=>{
-    const cnt=csc[cs.id]||0;
-    return`<span style="display:inline-flex;align-items:center;gap:0">
-      <button class="sfb f-cs ${flt===cs.id?'active':''}" onclick="setFlt('${list.id}','${cs.id}')">
-        🏪 ${esc(cs.name)}<span class="n">${cnt}</span>
-      </button>
-      <button class="sfb-del-empty" onclick="delCStore(event,'${list.id}','${cs.id}')" title="Eliminar tienda">✕</button>
-    </span>`;
-  }).join('');
 
   let html=`
   <div class="panel-hdr">
@@ -5428,12 +5424,14 @@ function buildShop(list){
   <div class="shop-filter-bar">
     <button class="sfb f-all   ${flt==='all'  ?'active':''}" onclick="setFlt('${list.id}','all')">${isPagos?'💳':'🏠'} Todos <span class="n">${pendAll}</span></button>
     ${isPagos?'':[
-      {key:'pali', cls:'f-pali', icon:'🏪', name:'Pali',          cnt:sc.pali},
-      {key:'verd', cls:'f-verd', icon:'🥬', name:'Verdulería',    cnt:sc.verd},
-      {key:'carn', cls:'f-carn', icon:'🥩', name:'Carnicería',    cnt:sc.carn},
-      {key:'pmm',  cls:'f-pmm',  icon:'🏬', name:'Pequeño Mundo', cnt:sc.pmm},
-      {key:'mayca',cls:'f-mayca',icon:'🏬', name:'MAYCA',         cnt:sc.mayca},
-      {key:'pric', cls:'f-pric', icon:'🏬', name:'Pricemart',     cnt:sc.pric},
+      {key:'verd',  cls:'f-verd',  icon:'🥬', name:'Verdulería',  cnt:sc.verd},
+      {key:'carn',  cls:'f-carn',  icon:'🥩', name:'Carnicería',  cnt:sc.carn},
+      {key:'superm',cls:'f-superm',icon:'🏪', name:'Supermercado',cnt:sc.superm},
+      {key:'minis', cls:'f-minis', icon:'🏪', name:'MiniSuper',   cnt:sc.minis},
+      {key:'feria', cls:'f-feria', icon:'🏟️', name:'Feria',       cnt:sc.feria},
+      {key:'panaderia',cls:'f-panaderia',icon:'🍞',name:'Panadería',cnt:sc.panaderia},
+      {key:'farmacia',cls:'f-farmacia',icon:'💊',name:'Farmacia',cnt:sc.farmacia},
+      {key:'hogar',cls:'f-hogar',icon:'🔧',name:'Hogar/Ferretería',cnt:sc.hogar},
     ].filter(st=>!(Array.isArray(s.hiddenFilters)?s.hiddenFilters:[]).includes(st.key))
      .map(st=>`<span style="display:inline-flex;align-items:center;gap:0">
       <button class="sfb ${st.cls} ${flt===st.key?'active':''}" onclick="setFlt('${list.id}','${st.key}')">
@@ -5441,15 +5439,7 @@ function buildShop(list){
       </button>
       <button class="sfb-del-empty" onclick="hideBuiltinFilter(event,'${list.id}','${st.key}')" title="Ocultar del filtro">✕</button>
     </span>`).join('')}
-    ${csBtns}
-    <button class="sfb f-add" onclick="toggleSAdd(event,'${list.id}')">＋ ${isPagos?'Medio de pago':'Tienda'}</button>
-    <div class="store-inline ${saOpen?'open':''}" id="sa-${list.id}">
-      <input type="text" id="si-${list.id}" placeholder="${isPagos?'Medio de pago…':'Nombre de la tienda…'}" maxlength="40"
-        onkeydown="if(event.key==='Enter') confSAdd('${list.id}');if(event.key==='Escape') toggleSAdd(event,'${list.id}')">
-      <button class="sai-ok" onclick="confSAdd('${list.id}')">Agregar</button>
-      <button class="sai-no" onclick="toggleSAdd(event,'${list.id}')">Cancelar</button>
-      ${(!isPagos&&(s.hiddenFilters||[]).length)?`<button class="sai-no" onclick="restoreFilters('${list.id}')" style="background:rgba(74,96,122,.1);border-color:rgba(74,96,122,.3)">↺ Restaurar ocultas</button>`:''}
-    </div>
+    ${(!isPagos&&(s.hiddenFilters||[]).length)?`<button class="sai-no" onclick="restoreFilters('${list.id}')" style="background:rgba(74,96,122,.1);border-color:rgba(74,96,122,.3);font-size:.75rem;padding:.25rem .5rem">↺ Restaurar ocultas</button>`:''}
   </div>
   <div class="shop-cats">`;
 
@@ -5851,24 +5841,8 @@ function shopItemHTML(item,list,flt,isCustom,catId){
 // ── store filter ──
 function setFlt(lid,s){shopFilter[lid]=s;renderAll(lid);}
 function setTaskFilter(lid,f){taskFilter[lid]=f;rebuildPanel(lid);}
-function toggleSAdd(e,lid){
-  e.stopPropagation();shopStoreAddOpen[lid]=!shopStoreAddOpen[lid];
-  const list=UD.lists.find(l=>l.id===lid);
-  rebuildPanel(lid);
-  if(shopStoreAddOpen[lid])setTimeout(()=>document.getElementById('si-'+lid)?.focus(),50);
-}
-function confSAdd(lid){
-  const inp=document.getElementById('si-'+lid);
-  const name=(inp?.value||'').trim();if(!name)return inp?.focus();
-  const list=UD.lists.find(l=>l.id===lid);
-  if(!list.shopping.customStores)list.shopping.customStores=[];
-  list.shopping.customStores.push({id:'cs-'+uid(),name});
-  shopStoreAddOpen[lid]=false;saveUD(list.id);
-  rebuildPanel(lid);
-}
 
 // ── Ocultar/mostrar tiendas del filtro ──
-
 function restoreFilters(lid){
   const list=UD.lists.find(l=>l.id===lid);
   list.shopping.hiddenFilters=[];
@@ -5883,17 +5857,6 @@ function hideBuiltinFilter(e,lid,storeKey){
     if(shopFilter[lid]===storeKey)shopFilter[lid]='all';
   }
   saveUD(lid);rebuildPanel(lid);
-}
-function delCStore(e,lid,sid){
-  e.stopPropagation();
-  const list=UD.lists.find(l=>l.id===lid);
-  const store=list.shopping.customStores?.find(s=>s.id===sid);
-  if(!store)return;
-  openConfirmModal(`¿Eliminar tienda?`,`Se quitará "${store.name}" de los filtros.`,()=>{
-    list.shopping.customStores=list.shopping.customStores.filter(s=>s.id!==sid);
-    if(shopFilter[lid]===sid)shopFilter[lid]='all';
-    saveUD(list.id);renderAll(lid);
-  });
 }
 
 // ── per-item badge stores ──
@@ -5918,12 +5881,6 @@ function addItemStore(e,lid,itemId,name){
   // don't add duplicate
   if(list.shopping.itemStores[itemId].some(s=>s.name.toLowerCase()===name.toLowerCase()))return;
   list.shopping.itemStores[itemId].push({id:'is-'+uid(),name});
-  // auto-add to filter bar if not already there
-  const builtinNames=Object.values(STORES).map(s=>s.name.toLowerCase());
-  if(!list.shopping.customStores)list.shopping.customStores=[];
-  const alreadyInBar=builtinNames.includes(name.toLowerCase())||
-    list.shopping.customStores.some(s=>s.name.toLowerCase()===name.toLowerCase());
-  if(!alreadyInBar) list.shopping.customStores.push({id:'cs-'+uid(),name});
   badgeAddOpen[lid+'_'+itemId]=true; // keep picker open for more
   saveUD(list.id);
   rebuildPanel(lid);
