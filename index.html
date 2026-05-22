@@ -9525,10 +9525,26 @@ async function openPurchaseHistory(todayOnly=false){
     if(error)throw error;
     // Fusionar con pendientes locales (si existieran por fallas previas)
     const pending=getPendingHistory();
-    _histData=[...(data||[]),...pending].sort((a,b)=>new Date(b.bought_at||b.ts||0)-new Date(a.bought_at||a.ts||0));
+    let merged=[...(data||[]),...pending].sort((a,b)=>new Date(b.bought_at||b.ts||0)-new Date(a.bought_at||a.ts||0));
+    // Si se pidió solo hoy y no hay datos, intenta últimas 24h para no dejar vacío
+    let summaryLabel = todayOnly ? 'Hoy' : 'Últimas compras';
+    if(todayOnly && merged.length===0){
+      const since24=new Date(Date.now()-24*3600*1000).toISOString();
+      const {data:dayData,error:dayErr}=await sb.from('purchase_history')
+        .select('*')
+        .eq('house_id',CH.shareCode)
+        .gte('bought_at',since24)
+        .order('bought_at',{ascending:false})
+        .limit(50);
+      if(!dayErr && dayData?.length){
+        merged=[...(dayData||[]),...pending].sort((a,b)=>new Date(b.bought_at||b.ts||0)-new Date(a.bought_at||a.ts||0));
+        summaryLabel='Últimas 24h';
+      }
+    }
+    _histData=merged;
     renderPurchaseHistory(_histData);
     const total=_histData.length;
-    document.getElementById('hist-summary').textContent=todayOnly?`Hoy: ${total} compra(s)`:`Últimas compras: ${total}`;
+    document.getElementById('hist-summary').textContent=`${summaryLabel}: ${total} compra(s)`;
   }catch(e){
     const pending=getPendingHistory();
     if(pending.length){
