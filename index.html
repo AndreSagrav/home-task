@@ -5662,8 +5662,10 @@ function shopItemHTML(item,list,flt,isCustom,catId){
   const baOpen=badgeAddOpen[lid+'_'+item.id]===true;
   // build list of all available stores (8 fijas), excluding ones already added to this item
   const allAvailableStores=Object.entries(STORES).map(([key,s])=>({id:key,name:s.name,icon:s.icon}));
-  const alreadyAdded=new Set((list.shopping.itemStores?.[item.id]||[]).map(s=>s.name.toLowerCase()));
-  const pickableStores=allAvailableStores.filter(s=>!alreadyAdded.has(s.name.toLowerCase()));
+  // Excluir tiendas ya asignadas al ítem (del catálogo) y tiendas personalizadas ya agregadas
+  const catalogStoreNames=new Set((item.stores||[]).map(sid=>STORES[sid]?.name?.toLowerCase()).filter(Boolean));
+  const alreadyAddedNames=new Set((list.shopping.itemStores?.[item.id]||[]).map(s=>s.name.toLowerCase()));
+  const pickableStores=allAvailableStores.filter(s=>!catalogStoreNames.has(s.name.toLowerCase())&&!alreadyAddedNames.has(s.name.toLowerCase()));
   const badgeAddSection=baOpen?`
     <span class="badge-store-picker" id="ba-${lid}-${item.id}">
       ${pickableStores.length
