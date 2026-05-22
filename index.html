@@ -9498,11 +9498,11 @@ async function areGlobalNotificationsEnabled(){
 // ══════════════════════ HISTORIAL DE COMPRAS (usuario) ══════════════════════
 let _histData=[];
 
-function facturaHistoryEntries(hours=24){
-  if(!_facturas||!CH)return [];
+function facturaHistoryEntries(hours=24,factList=_facturas){
+  if(!factList||!CH)return [];
   const since=Date.now()-(hours*3600*1000);
   const rows=[];
-  _facturas.forEach(f=>{
+  factList.forEach(f=>{
     if(f.house_id!==CH.shareCode) return;
     const ts=new Date(f.created_at||f.ts||Date.now()).getTime();
     if(ts<since) return;
@@ -9569,9 +9569,24 @@ async function openPurchaseHistory(todayOnly=false){
     if(error)throw error;
     // Fusionar con pendientes locales (si existieran por fallas previas)
     const pending=getPendingHistory();
-    const factRows=facturaHistoryEntries(todayOnly?24:24*7);
-    const merged=[...(data||[]),...pending,...factRows].sort((a,b)=>new Date(b.bought_at||b.ts||0)-new Date(a.bought_at||a.ts||0));
-    const summaryLabel = todayOnly ? 'Últimas 24h (incl. facturas locales)' : 'Últimas compras';
+    const factHours=todayOnly?24:24*7;
+    // Facturas locales ya cargadas en memoria
+    const factRowsLocal=facturaHistoryEntries(factHours,_facturas);
+    // Facturas remotas recientes
+    let factRowsRemote=[];
+    try{
+      const sinceFact=new Date(Date.now()-factHours*3600*1000).toISOString();
+      const {data:factData}=await sb.from('facturas')
+        .select('*')
+        .eq('house_id',CH.shareCode)
+        .gte('created_at',sinceFact)
+        .order('created_at',{ascending:false})
+        .limit(200);
+      factRowsRemote=facturaHistoryEntries(factHours,factData||[]).map(r=>({...r,__factura:true}));
+    }catch(_){/*silencio*/}
+    const merged=[...(data||[]),...pending,...factRowsLocal,...factRowsRemote]
+      .sort((a,b)=>new Date(b.bought_at||b.ts||0)-new Date(a.bought_at||a.ts||0));
+    const summaryLabel = todayOnly ? 'Últimas 24h (incl. facturas locales/remotas)' : 'Últimas compras';
     _histData=merged;
     renderPurchaseHistory(_histData);
     const total=_histData.length;
