@@ -5660,21 +5660,10 @@ function shopItemHTML(item,list,flt,isCustom,catId){
     .filter(s=>flt==='all'||s.name.toLowerCase()===flt.toLowerCase()||s.id===flt)
     .map(s=>`<span class="sbadge sb-icust">🏪 ${esc(s.name)}<span class="sx" onclick="delItemStore(event,'${lid}','${item.id}','${s.id}')">✕</span></span>`).join('');
   const baOpen=badgeAddOpen[lid+'_'+item.id]===true;
-  // build list of all available stores (builtin + custom), excluding ones already added to this item
-  const allAvailableStores=[
-    ...Object.entries(STORES).map(([key,s])=>({id:key,name:s.name,icon:s.icon,builtin:true})),
-    ...(list.shopping.customStores||[]).map(s=>({id:s.id,name:s.name,icon:'🏪',builtin:false}))
-  ];
-  const alreadyAdded=new Set([
-    ...(list.shopping.hiddenStores?.[item.id]||[]),
-    ...(list.shopping.itemStores?.[item.id]||[]).map(s=>s.name.toLowerCase())
-  ]);
-  // also exclude builtin stores already shown on the item (not hidden)
-  const shownBuiltin=new Set((item.stores||[]).filter(s=>!(list.shopping.hiddenStores?.[item.id]||[]).includes(s)));
-  const pickableStores=allAvailableStores.filter(s=>{
-    if(s.builtin) return !shownBuiltin.has(s.id); // hide if already shown as badge
-    return !alreadyAdded.has(s.name.toLowerCase());
-  });
+  // build list of all available stores (8 fijas), excluding ones already added to this item
+  const allAvailableStores=Object.entries(STORES).map(([key,s])=>({id:key,name:s.name,icon:s.icon}));
+  const alreadyAdded=new Set((list.shopping.itemStores?.[item.id]||[]).map(s=>s.name.toLowerCase()));
+  const pickableStores=allAvailableStores.filter(s=>!alreadyAdded.has(s.name.toLowerCase()));
   const badgeAddSection=baOpen?`
     <span class="badge-store-picker" id="ba-${lid}-${item.id}">
       ${pickableStores.length
