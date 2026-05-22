@@ -6271,13 +6271,13 @@ function openSubBuyConfirm(lid,itemId,subId){
   subMbcSetCurr('CRC');
   const stDiv=document.getElementById('sub-mbc-stores');
   stDiv.innerHTML=allStores.length
-    ?allStores.map(s=>`<button class="mbc-store-btn" onclick="subMbcSelStore('${s.id}','${esc(s.name)}')" id="smbs-${s.id.replace(/[^a-z0-9]/gi,'')}">${s.icon||'🏪'} ${esc(s.name)}</button>`).join('')+'<button class="mbc-store-btn" onclick="subMbcShowOtherStore()" id="smbs-other">✏️ Otra</button>'
+    ?allStores.map(s=>`<button class="mbc-store-btn" onclick="subMbcSelStore('${s.id}','${esc(s.name)}')" id="smbs-${s.id.replace(/[^a-z0-9]/gi,'')}">${s.icon||'🏪'} ${esc(s.name)}</button>`).join('')
     :`<span style="font-size:.75rem;color:var(--muted)">${isPagos?'Sin medios de pago configurados — podés omitir':'Sin tiendas configuradas'}</span>`;
-  // Input para tienda personalizada (oculto inicialmente)
-  const otherDiv=document.getElementById('sub-mbc-other-store')||document.createElement('div');
-  otherDiv.id='sub-mbc-other-store';
-  otherDiv.style.cssText='display:none;margin-top:.5rem;gap:.3rem;align-items:center;flex-wrap:wrap';
-  otherDiv.innerHTML=`<input type="text" id="sub-mbc-other-name" placeholder="Nombre de la tienda" maxlength="40" style="flex:1;min-width:120px;padding:.35rem .6rem;border:1.5px solid var(--sand);border-radius:8px;font-size:.8rem;background:var(--bg-card);"><button onclick="subMbcConfirmOther()" style="padding:.35rem .7rem;background:var(--sage);color:white;border:none;border-radius:8px;font-size:.78rem;cursor:pointer;">OK</button>`;
+  // Input para nombre específico de tienda (oculto inicialmente)
+  const otherDiv=document.getElementById('sub-mbc-store-name-div')||document.createElement('div');
+  otherDiv.id='sub-mbc-store-name-div';
+  otherDiv.style.cssText='display:none;margin-top:.5rem;';
+  otherDiv.innerHTML=`<label style="font-size:.72rem;color:var(--muted);display:block;margin-bottom:.2rem;">Nombre de la tienda:</label><input type="text" id="sub-mbc-store-name-input" placeholder="Ej: Walmart, etc." maxlength="50" style="width:100%;padding:.4rem .6rem;border:1.5px solid var(--sand);border-radius:8px;font-size:.85rem;background:var(--bg-card);" oninput="subMbcUpdateStoreName(this.value)">`;
   stDiv.parentNode.insertBefore(otherDiv,stDiv.nextSibling);
   openModal('modal-sub-buy');
   setTimeout(()=>document.getElementById('sub-mbc-price')?.focus(),120);
@@ -6292,22 +6292,21 @@ function subMbcSelStore(id,name){
   document.querySelectorAll('#sub-mbc-stores .mbc-store-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('smbs-'+id.replace(/[^a-z0-9]/gi,''))?.classList.add('active');
   document.getElementById('sub-mbc-store-err').style.display='none';
+  // Mostrar input para nombre específico de tienda
+  const otherDiv=document.getElementById('sub-mbc-store-name-div');
+  if(otherDiv) otherDiv.style.display='block';
+  const input=document.getElementById('sub-mbc-store-name-input');
+  if(input){
+    input.value='';
+    input.placeholder=`Nombre de ${name} (ej: ${name} Santa Ana)`;
+    input.focus();
+  }
 }
-function subMbcShowOtherStore(){
-  const div=document.getElementById('sub-mbc-other-store');
-  if(div) div.style.display='flex';
-  document.getElementById('sub-mbc-other-name')?.focus();
-  _subMbc.selStore={id:'other',name:''};
-  document.querySelectorAll('#sub-mbc-stores .mbc-store-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('smbs-other')?.classList.add('active');
-}
-function subMbcConfirmOther(){
-  const name=(document.getElementById('sub-mbc-other-name')?.value||'').trim();
-  if(!name)return;
-  _subMbc.selStore={id:'other-'+uid(),name};
-  document.getElementById('sub-mbc-store-err').style.display='none';
-  const div=document.getElementById('sub-mbc-other-store');
-  if(div) div.style.display='none';
+function subMbcUpdateStoreName(name){
+  const trimmed=name.trim();
+  if(_subMbc.selStore && trimmed){
+    _subMbc.selStore.name=trimmed;
+  }
 }
 async function subMbcConfirm(){
   if(!_subMbc)return;
@@ -6464,13 +6463,13 @@ function openBuyConfirm(lid,itemId,itemName,list){
   }
   const stDiv=document.getElementById('mbc-stores');
   stDiv.innerHTML=allStores.length
-    ?allStores.map(s=>`<button class="mbc-store-btn" onclick="mbcSelStore('${s.id}','${esc(s.name)}')" id="mbcsb-${s.id.replace(/[^a-z0-9]/gi,'')}">${s.icon||'🏪'} ${esc(s.name)}</button>`).join('')+'<button class="mbc-store-btn" onclick="mbcShowOtherStore()" id="mbcsb-other">✏️ Otra</button>'
-    :`<span style="font-size:.75rem;color:var(--muted);">Sin tiendas configuradas — podés omitir</span>`;
-  // Input para tienda personalizada (oculto inicialmente)
-  const otherDiv=document.getElementById('mbc-other-store')||document.createElement('div');
-  otherDiv.id='mbc-other-store';
-  otherDiv.style.cssText='display:none;margin-top:.5rem;gap:.3rem;align-items:center;flex-wrap:wrap';
-  otherDiv.innerHTML=`<input type="text" id="mbc-other-name" placeholder="Nombre de la tienda" maxlength="40" style="flex:1;min-width:120px;padding:.35rem .6rem;border:1.5px solid var(--sand);border-radius:8px;font-size:.8rem;background:var(--bg-card);"><button onclick="mbcConfirmOther()" style="padding:.35rem .7rem;background:var(--sage);color:white;border:none;border-radius:8px;font-size:.78rem;cursor:pointer;">OK</button>`;
+    ?allStores.map(s=>`<button class="mbc-store-btn" onclick="mbcSelStore('${s.id}','${esc(s.name)}')" id="mbcsb-${s.id.replace(/[^a-z0-9]/gi,'')}">${s.icon||'🏪'} ${esc(s.name)}</button>`).join('')
+    :`<span style="font-size:.75rem;color:var(--muted);">Sin tiendas configuradas</span>`;
+  // Input para nombre específico de tienda (oculto inicialmente)
+  const otherDiv=document.getElementById('mbc-store-name-div')||document.createElement('div');
+  otherDiv.id='mbc-store-name-div';
+  otherDiv.style.cssText='display:none;margin-top:.5rem;';
+  otherDiv.innerHTML=`<label style="font-size:.72rem;color:var(--muted);display:block;margin-bottom:.2rem;">Nombre de la tienda:</label><input type="text" id="mbc-store-name-input" placeholder="Ej: Walmart, Auto Mercado, etc." maxlength="50" style="width:100%;padding:.4rem .6rem;border:1.5px solid var(--sand);border-radius:8px;font-size:.85rem;background:var(--bg-card);" oninput="mbcUpdateStoreName(this.value)">`;
   stDiv.parentNode.insertBefore(otherDiv,stDiv.nextSibling);
   // Cambiar texto del botón según si es pagos o compras
   document.getElementById('mbc-confirm').textContent=isPagos?'✓ Confirmar':'🛒 Al carrito';
@@ -6478,23 +6477,11 @@ function openBuyConfirm(lid,itemId,itemName,list){
   setTimeout(()=>document.querySelector('#mbc-price-rows .mbc-price-inp')?.focus(),120);
 }
 
-function mbcShowOtherStore(){
-  const div=document.getElementById('mbc-other-store');
-  if(div) div.style.display='flex';
-  document.getElementById('mbc-other-name')?.focus();
-  // Deseleccionar tienda previamente seleccionada
-  _mbc.selStore={id:'other',name:''};
-  document.querySelectorAll('#mbc-stores .mbc-store-btn').forEach(b=>b.classList.remove('sel'));
-  document.getElementById('mbcsb-other')?.classList.add('sel');
-}
-function mbcConfirmOther(){
-  const name=(document.getElementById('mbc-other-name')?.value||'').trim();
-  if(!name)return;
-  _mbc.selStore={id:'other-'+uid(),name};
-  document.getElementById('mbc-store-err').style.display='none';
-  // Ocultar input
-  const div=document.getElementById('mbc-other-store');
-  if(div) div.style.display='none';
+function mbcUpdateStoreName(name){
+  const trimmed=name.trim();
+  if(_mbc.selStore && trimmed){
+    _mbc.selStore.name=trimmed;
+  }
 }
 function mbcSetCurr(c){
   _mbc.curr=c;
@@ -6535,6 +6522,15 @@ function mbcSelStore(id,name){
   document.querySelectorAll('#mbc-stores .mbc-store-btn').forEach(b=>b.classList.remove('sel'));
   document.getElementById('mbcsb-'+id.replace(/[^a-z0-9]/gi,''))?.classList.add('sel');
   document.getElementById('mbc-store-err').style.display='none';
+  // Mostrar input para nombre específico de tienda
+  const otherDiv=document.getElementById('mbc-store-name-div');
+  if(otherDiv) otherDiv.style.display='block';
+  const input=document.getElementById('mbc-store-name-input');
+  if(input){
+    input.value='';
+    input.placeholder=`Nombre de ${name} (ej: ${name} Santa Ana)`;
+    input.focus();
+  }
 }
 function mbcCancel(){
   closeModals();
