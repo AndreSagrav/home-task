@@ -2312,9 +2312,7 @@ async function loadHouseFromSupabase(code){
 // ── Guarda historial de compras en Supabase (con reintentos y respaldo local) ──
 async function savePurchaseHistory(entries){
   if(!CH||!entries||!entries.length)return;
-  const validEntries=entries.filter(e=>e.price>0);
-  if(!validEntries.length)return;
-  const rows=validEntries.map(e=>{
+  const rows=entries.map(e=>{
     const list=UD.lists.find(l=>l.id===e.listId);
     const isPagos=list?._tpl==='tpl-pagos' || list?.name==='Pagos y Servicios';
     return {
@@ -9500,6 +9498,51 @@ async function areGlobalNotificationsEnabled(){
 // ══════════════════════ HISTORIAL DE COMPRAS (usuario) ══════════════════════
 let _histData=[];
 
+function facturaHistoryEntries(hours=24){
+  if(!_facturas||!CH)return [];
+  const since=Date.now()-(hours*3600*1000);
+  const rows=[];
+  _facturas.forEach(f=>{
+    if(f.house_id!==CH.shareCode) return;
+    const ts=new Date(f.created_at||f.ts||Date.now()).getTime();
+    if(ts<since) return;
+    (f.items||[]).forEach(it=>{
+      if(it.subs&&Array.isArray(it.subs)){
+        it.subs.forEach((s,i)=>{
+          rows.push({
+            id:'fh-'+uid(),
+            item_name:it.name||'(Factura)',
+            tipo:s.tipo||it.tipo||null,
+            marca:s.marca||it.marca||null,
+            cantidad:s.cant||s.qty||null,
+            price:s.price||0,
+            currency:it.curr||s.curr||'CRC',
+            store:it.store||null,
+            bought_by:f.created_by||null,
+            bought_at:f.created_at||new Date(ts).toISOString(),
+            __factura:true
+          });
+        });
+      } else {
+        rows.push({
+          id:'fh-'+uid(),
+          item_name:it.name||'(Factura)',
+          tipo:it.tipo||null,
+          marca:it.marca||null,
+          cantidad:it.cant||null,
+          price:it.price||0,
+          currency:it.curr||'CRC',
+          store:it.store||null,
+          bought_by:f.created_by||null,
+          bought_at:f.created_at||new Date(ts).toISOString(),
+          __factura:true
+        });
+      }
+    });
+  });
+  return rows;
+}
+
 async function openPurchaseHistory(todayOnly=false){
   const panel=document.getElementById('hist-panel');
   const bg=document.getElementById('hist-bg');
@@ -9526,8 +9569,9 @@ async function openPurchaseHistory(todayOnly=false){
     if(error)throw error;
     // Fusionar con pendientes locales (si existieran por fallas previas)
     const pending=getPendingHistory();
-    const merged=[...(data||[]),...pending].sort((a,b)=>new Date(b.bought_at||b.ts||0)-new Date(a.bought_at||a.ts||0));
-    const summaryLabel = todayOnly ? 'Últimas 24h' : 'Últimas compras';
+    const factRows=facturaHistoryEntries(todayOnly?24:24*7);
+    const merged=[...(data||[]),...pending,...factRows].sort((a,b)=>new Date(b.bought_at||b.ts||0)-new Date(a.bought_at||a.ts||0));
+    const summaryLabel = todayOnly ? 'Últimas 24h (incl. facturas locales)' : 'Últimas compras';
     _histData=merged;
     renderPurchaseHistory(_histData);
     const total=_histData.length;
@@ -9611,6 +9655,7 @@ function renderPurchaseHistory(rows){
         <div style="text-align:right;flex-shrink:0">
           <div style="font-size:.82rem;font-weight:600;color:#E8A878">${curr}${Number(r.price).toLocaleString('es-CR')}${r.__pending?' · pend.':''}</div>
           <div style="font-size:.62rem;color:#9A7860;margin-top:.1rem">${esc(r.bought_by||'?')}</div>
+          ${r.__factura?`<div style="font-size:.62rem;color:#9A7860;margin-top:.1rem">Factura local</div>`:''}
         </div>
       </div>`;
     }).join('');
