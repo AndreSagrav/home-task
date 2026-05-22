@@ -9503,6 +9503,40 @@ async function areGlobalNotificationsEnabled(){
 // ══════════════════════ HISTORIAL DE COMPRAS (usuario) ══════════════════════
 let _histData=[];
 
+function activityHistoryEntries(hours=24){
+  const since=Date.now()-(hours*3600*1000);
+  const log=(_logCache&&_logCache.length)?_logCache:getLog();
+  if(!log||!log.length)return[];
+  return log.filter(e=>{
+    if(!e.ts||e.ts<since)return false;
+    return ['buy','invoice-paid','invoice-created'].includes(e.type);
+  }).map(e=>{
+    const ts=new Date(e.ts||Date.now()).toISOString();
+    if(e.type==='buy'){
+      return {
+        id:'ah-'+(e.id||uid()),
+        item_name:e.detail?.task||'(Compra)',
+        price:0,
+        currency:'CRC',
+        store:e.detail?.store||null,
+        bought_by:e.who||null,
+        bought_at:ts,
+        __activity:true
+      };
+    }
+    return {
+      id:'ah-'+(e.id||uid()),
+      item_name:e.type==='invoice-paid'?'Factura pagada':'Factura creada',
+      price:0,
+      currency:'CRC',
+      store:null,
+      bought_by:e.who||null,
+      bought_at:ts,
+      __activity:true
+    };
+  });
+}
+
 function facturaHistoryEntries(hours=24,factList=_facturas){
   if(!factList||!CH)return [];
   const since=Date.now()-(hours*3600*1000);
@@ -9601,8 +9635,13 @@ async function openPurchaseHistory(todayOnly=true){
         .limit(200);
       factRowsRemote=facturaHistoryEntries(factHours,factData||[]).map(r=>({...r,__factura:true}));
     }catch(_){/*silencio*/}
-    const merged=[...(data||[]),...pending,...factRowsLocal,...factRowsRemote]
+    let merged=[...(data||[]),...pending,...factRowsLocal,...factRowsRemote]
       .sort((a,b)=>new Date(b.bought_at||b.ts||0)-new Date(a.bought_at||a.ts||0));
+    // Si sigue vacío (p.ej. offline y sin facturas), usar log de actividad reciente
+    if(merged.length===0){
+      const act=activityHistoryEntries(factHours);
+      merged=[...act].sort((a,b)=>new Date(b.bought_at||b.ts||0)-new Date(a.bought_at||a.ts||0));
+    }
     const summaryLabel = todayOnly ? 'Últimas 24h (incl. facturas locales/remotas)' : 'Últimas compras';
     _histData=merged;
     renderPurchaseHistory(_histData);
