@@ -9500,7 +9500,7 @@ async function areGlobalNotificationsEnabled(){
 // ══════════════════════ HISTORIAL DE COMPRAS (usuario) ══════════════════════
 let _histData=[];
 
-async function openPurchaseHistory(){
+async function openPurchaseHistory(todayOnly=false){
   const panel=document.getElementById('hist-panel');
   const bg=document.getElementById('hist-bg');
   panel.style.transform='translateX(0)';
@@ -9511,16 +9511,24 @@ async function openPurchaseHistory(){
   try{
     // Reintentar enviar pendientes antes de leer
     await flushPendingHistory();
-    const {data,error}=await sb.from('purchase_history')
+    const todayStart=new Date();todayStart.setHours(0,0,0,0);
+    const tomorrow=new Date(todayStart);tomorrow.setDate(tomorrow.getDate()+1);
+    let q=sb.from('purchase_history')
       .select('*')
-      .eq('house_id',CH.shareCode)
-      .order('bought_at',{ascending:false})
-      .limit(300);
+      .eq('house_id',CH.shareCode);
+    if(todayOnly){
+      q=q.gte('bought_at',todayStart.toISOString()).lt('bought_at',tomorrow.toISOString()).order('bought_at',{ascending:false});
+    } else {
+      q=q.order('bought_at',{ascending:false}).limit(300);
+    }
+    const {data,error}=await q;
     if(error)throw error;
     // Fusionar con pendientes locales (si existieran por fallas previas)
     const pending=getPendingHistory();
     _histData=[...(data||[]),...pending].sort((a,b)=>new Date(b.bought_at||b.ts||0)-new Date(a.bought_at||a.ts||0));
     renderPurchaseHistory(_histData);
+    const total=_histData.length;
+    document.getElementById('hist-summary').textContent=todayOnly?`Hoy: ${total} compra(s)`:`Últimas compras: ${total}`;
   }catch(e){
     const pending=getPendingHistory();
     if(pending.length){
@@ -10543,6 +10551,7 @@ if(!navigator.onLine) showBanner();
   <div style="background:#130D08;padding:1rem 1.2rem;display:flex;align-items:center;gap:.8rem;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.08)">
     <span style="font-size:1.1rem">📊</span>
     <h2 style="font-family:'Fraunces',Georgia,serif;color:#E8D0B8;font-size:1.1rem;font-weight:400;flex:1">Historial de Compras</h2>
+    <button onclick="openPurchaseHistory(true)" title="Solo hoy" style="background:none;border:1px solid rgba(255,255,255,.12);color:#B89880;font-size:.9rem;cursor:pointer;padding:.25rem .5rem;border-radius:8px">Hoy</button>
     <button onclick="openPurchaseHistory()" title="Actualizar" style="background:none;border:none;color:#B89880;font-size:1rem;cursor:pointer;padding:.2rem .4rem;border-radius:6px">🔄</button>
     <button onclick="closePurchaseHistory()" style="background:none;border:none;color:#B89880;font-size:1.1rem;cursor:pointer;padding:.2rem .4rem;border-radius:6px">✕</button>
   </div>
