@@ -1,4 +1,4 @@
-const CACHE='mh-v7-fix';
+const CACHE='mh-v14-autoflush';
 const ASSETS=['./'];
 
 self.addEventListener('install',e=>{

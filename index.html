@@ -1105,26 +1105,9 @@ body.dark .note-row textarea{background:var(--bg-input);color:var(--text);border
   .ap-card{padding:.9rem 1rem;border-radius:14px;}
   .ap-card-hdr{flex-wrap:wrap;gap:.4rem;}
 
-  /* KPIs — 2 columnas en móvil */
-  #s-kpis{grid-template-columns:repeat(2,1fr) !important;}
-
   /* Exportar — stack vertical en pantallas pequeñas */
   .ap-export-row{flex-wrap:wrap;gap:.6rem;}
   .ap-export-btn{margin-left:0;width:100%;}
-
-  /* Toggle modo stats */
-  .stats-mode-toggle{width:100%;box-sizing:border-box;}
-  .smode-btn{flex:1;text-align:center;font-size:.74rem;padding:.35rem .5rem;}
-
-  /* Sub-tabs de estadísticas — scroll horizontal */
-  .stats-subtabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:.5rem;}
-  .stats-subtabs::-webkit-scrollbar{display:none;}
-  .stab{flex-shrink:0;white-space:nowrap;}
-
-  /* Gráficos — altura reducida */
-  #sc-timeline,#sc-monthly{height:160px !important;}
-  #sc-top,#sc-prange{height:200px !important;}
-  #sc-stores,#sc-users,#sc-weekday{height:160px !important;}
 }
 
 @media(max-width:400px){
@@ -1661,8 +1644,127 @@ body{line-height:1.6;}
 @media(prefers-reduced-motion:reduce){
   *{animation-duration:.01ms !important;transition-duration:.01ms !important;}
 }
+
+/* ══ ANALÍTICAS — DIAGNÓSTICO ══ */
+.stats-diag-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:.7rem;
+  margin-bottom:1.2rem;
+}
+.stats-diag-card{
+  background:linear-gradient(145deg,rgba(196,113,74,.08),rgba(168,90,53,.04));
+  border:1px solid rgba(196,113,74,.18);
+  border-radius:14px;
+  padding:.9rem 1rem;
+  transition:transform .15s ease,border-color .15s ease;
+}
+.stats-diag-card:hover{
+  transform:translateY(-2px);
+  border-color:rgba(232,160,96,.35);
+}
+.stats-diag-label{
+  font-size:.7rem;
+  font-weight:600;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  color:rgba(200,160,110,.65);
+  margin-bottom:.3rem;
+}
+.stats-diag-value{
+  font-family:'Fraunces',Georgia,serif;
+  font-size:1.55rem;
+  font-weight:700;
+  background:linear-gradient(135deg,#F0D0A0,#E8946A);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  line-height:1.1;
+  word-break:break-word;
+}
+.stats-diag-sub{
+  font-size:.72rem;
+  color:rgba(184,152,128,.55);
+  margin-top:.25rem;
+  line-height:1.3;
+}
+.stats-diag-section{
+  margin-top:1.3rem;
+  padding-top:1rem;
+  border-top:1px solid rgba(196,113,74,.15);
+}
+.stats-diag-section-ttl{
+  font-size:.85rem;
+  font-weight:600;
+  color:#EDD8C0;
+  margin-bottom:.6rem;
+}
+.stats-diag-totals{
+  display:flex;
+  flex-wrap:wrap;
+  gap:.6rem;
+}
+.stats-diag-total-item{
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+  background:rgba(20,12,8,.5);
+  border:1px solid rgba(196,113,74,.22);
+  border-radius:10px;
+  padding:.5rem .85rem;
+}
+.sdt-curr{
+  font-size:.7rem;
+  font-weight:700;
+  letter-spacing:.05em;
+  color:rgba(200,160,110,.75);
+}
+.sdt-val{
+  font-family:'Fraunces',Georgia,serif;
+  font-size:1.05rem;
+  font-weight:600;
+  color:#F0D0A0;
+}
+.stats-diag-recent{
+  display:flex;
+  flex-direction:column;
+  gap:.4rem;
+}
+.stats-diag-row{
+  display:grid;
+  grid-template-columns:1fr auto;
+  align-items:center;
+  gap:.3rem 1rem;
+  padding:.55rem .8rem;
+  background:rgba(20,12,8,.4);
+  border:1px solid rgba(196,113,74,.12);
+  border-radius:10px;
+}
+.sdr-item{
+  grid-column:1;
+  grid-row:1;
+  font-weight:600;
+  font-size:.88rem;
+  color:#EDD8C0;
+}
+.sdr-meta{
+  grid-column:1;
+  grid-row:2;
+  font-size:.72rem;
+  color:rgba(184,152,128,.55);
+}
+.sdr-price{
+  grid-column:2;
+  grid-row:1 / span 2;
+  font-family:'Fraunces',Georgia,serif;
+  font-weight:700;
+  font-size:1rem;
+  color:#E8946A;
+  white-space:nowrap;
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 <!-- Banner instalar PWA -->
@@ -2328,8 +2430,7 @@ async function savePurchaseHistory(entries){
       currency:e.currency||'CRC',
       store:e.store||null,
       bought_by:CU?.name||null,
-      bought_at:new Date().toISOString(),
-      list_type:isPagos?'pagos':'shopping'
+      bought_at:new Date().toISOString()
     };
   });
   // Guardar respaldo local inmediatamente (antes de intentar Supabase)
@@ -2360,9 +2461,19 @@ async function flushPendingHistory(){
   let pending=[];
   try{ pending=JSON.parse(localStorage.getItem(backupKey)||'[]'); }catch(_){ pending=[]; }
   if(!pending.length) return;
+  // Sanitizar: eliminar campos que no existen en la columna (ej. list_type) antes de insertar
+  const sanitized=pending.map(r=>{
+    const {list_type, ...rest}=r||{};
+    return rest;
+  });
   try{
-    const {error}=await sb.from('purchase_history').insert(pending);
-    if(!error){ try{ localStorage.removeItem(backupKey); }catch(_){ } }
+    const {error}=await sb.from('purchase_history').insert(sanitized);
+    if(!error){
+      try{ localStorage.removeItem(backupKey); }catch(_){ }
+      console.log(`flushPendingHistory: ${sanitized.length} registros migrados a Supabase`);
+    } else {
+      console.warn('flushPendingHistory error:',error.message);
+    }
   }catch(e){
     console.warn('flushPendingHistory:',e.message);
   }
@@ -4256,8 +4367,6 @@ function openProfileModal(){
   const _updateAdminBtn = ()=>{
     const show = isAdmin() || (CH && isHouseAdminCached(CH.shareCode));
     document.getElementById('admin-btn-wrap').style.display=show?'block':'none';
-    const sw=document.getElementById('admin-stats-btn-wrap');
-    if(sw) sw.style.display=show?'block':'none';
   };
   _updateAdminBtn();
   // Si el cache aún no se cargó, cargar y reaplicar visibilidad
@@ -4409,6 +4518,8 @@ async function enterHouse(house){
   // Asegurar cache de casas administradas antes de mostrar UI (para botón admin)
   if(!_myAdminHouses) loadMyAdminHouses().catch(()=>{});
   ensureHouseAdmin(CH.shareCode).catch(()=>{});
+  // Auto-flush: subir compras atrapadas en localStorage de esta casa (background)
+  if(typeof flushPendingHistory==='function') flushPendingHistory().catch(()=>{});
 
   // Mostrar la app inmediatamente con caché local (si hay)
   UD=getHouseData(CH.shareCode);
@@ -5246,17 +5357,39 @@ function countPending(list){
       ,0);
       return taskPending+scPending;
     }
-    const chk=list.shopping?.checked||{};
-    const cc=Array.isArray(list.shopping?.customCats)?list.shopping.customCats:[];
-    const extraRaw=list.shopping?.extraItems||{};
+    const s=list.shopping||{};
+    const chk=s.checked||{};
+    if(!isPagos&&Array.isArray(s.inventoryItems)){
+      const cartNow=getCart(list.id)||[];
+      const cartItemIds=new Set(cartNow.filter(e=>!e.isSub).map(e=>e.itemId));
+      const cartSubIds=new Set(cartNow.filter(e=>e.isSub).map(e=>e.subId));
+      const pendingItems=s.inventoryItems.filter(i=>{
+        const isPending=!!s.inventoryPending?.[i.id]||chk[i.id]?.bought===false;
+        if(!isPending) return false;
+        const itemStatus=chk[i.id];
+        const inCartPersisted=!!s.inventoryPending?.[i.id]?.inCart;
+        const inCartReal=cartItemIds.has(i.id);
+        const inCartFlag=!!itemStatus?.inCart;
+        const isBoughtNotCart=!!(itemStatus?.bought&&!itemStatus?.inCart&&!s.inventoryPending?.[i.id]);
+        if(inCartPersisted) return false;
+        if(inCartReal) return false;
+        if(inCartFlag) return false;
+        if(isBoughtNotCart) return false;
+        const subs=s.subItems?.[i.id]||[];
+        if(subs.length>0){
+          const subBought=s.subBought||{};
+          const allInCart=subs.every(sc=>subBought[sc.id]?.inCart||cartSubIds.has(sc.id));
+          if(allInCart) return false;
+        }
+        return true;
+      });
+      return pendingItems.length;
+    }
+    const cc=Array.isArray(s.customCats)?s.customCats:[];
+    const extraRaw=s.extraItems||{};
     const extraItemsFlat=Array.isArray(extraRaw)?extraRaw:Object.values(extraRaw).flat();
-    const allShop=[
-      ...getCatalogForList(list).flatMap(c=>c.items),
-      ...cc.flatMap(c=>c.items||[]),
-      ...extraItemsFlat
-    ];
-    return allShop.filter(i=>!chk[i.id]?.bought).length
-         +(list.tasks||[]).filter(t=>!t.done).length;
+    const allShop=[...getCatalogForList(list).flatMap(c=>c.items),...cc.flatMap(c=>c.items||[]),...extraItemsFlat];
+    return allShop.filter(i=>!chk[i.id]?.bought).length+(list.tasks||[]).filter(t=>!t.done).length;
   }catch(e){console.error('countPending error:',e);return 0;}
 }
 function renderTabs(){
@@ -8568,9 +8701,6 @@ async function markFacturaPaid(id,totalStr,listName){
   renderFacturasModal();
 }
 
-// openStatsPanel → redirige al panel de administrador existente
-function openStatsPanel(){ openAdminPanel(); adminTab('stats'); }
-
 function clearAllCosts(lid){
   const list=UD.lists.find(l=>l.id===lid);
   const s=list.shopping;
@@ -9149,7 +9279,7 @@ function adminTab(tab){
   // Bloquear tabs 'admins' y 'settings' fuera de scope global
   if((tab==='admins' || tab==='settings') && _adminScope!=='global') tab='users';
   _adminTab=tab;
-  ['users','houses','history','export','cleanup','admins','stats','settings'].forEach(t=>{
+  ['users','houses','history','stats','export','cleanup','admins','settings'].forEach(t=>{
     const btn=document.getElementById('atab-'+t);
     const panel=document.getElementById('apanel-'+t);
     const active=t===tab;
@@ -9159,9 +9289,9 @@ function adminTab(tab){
   if(tab==='users') adminLoadUsers();
   else if(tab==='houses') adminLoadHouses();
   else if(tab==='history') adminLoadHistory();
+  else if(tab==='stats') adminLoadStats();
   else if(tab==='cleanup') adminLoadCleanup();
   else if(tab==='admins') adminLoadAdmins();
-  else if(tab==='stats') adminLoadStats();
   else if(tab==='settings') adminLoadSettings();
 }
 
@@ -9747,23 +9877,226 @@ function renderPurchaseHistory(rows){
 // ══════════════════════ ADMIN: HISTORIAL + EXPORTAR ══════════════════════
 var _allHistory = [];
 
+// Loader compartido: une purchase_history + items de facturas (dedup)
+async function _loadMergedPurchases(scopeHouse){
+  // 1) purchase_history
+  let q = sb.from('purchase_history').select('*').order('bought_at',{ascending:false}).limit(5000);
+  if(scopeHouse) q = q.eq('house_id', scopeHouse);
+  const phRes = await q;
+  if(phRes.error) throw phRes.error;
+  const phRows = phRes.data || [];
+
+  // 2) facturas → items expandidos
+  let factRows = [];
+  try{
+    let qF = sb.from('facturas').select('*').order('created_at',{ascending:false}).limit(2000);
+    if(scopeHouse) qF = qF.eq('house_id', scopeHouse);
+    const factRes = await qF;
+    const facts = factRes.data || [];
+    facts.forEach(f=>{
+      (f.items||[]).forEach(it=>{
+        const baseRow = {
+          house_id:f.house_id,
+          list_id:f.list_id,
+          item_id:it.id||null,
+          item_name:it.name||'(Factura)',
+          bought_by:f.created_by||null,
+          bought_at:f.created_at||null,
+          store:it.store||null,
+          __factura:true,
+          __factura_id:f.id
+        };
+        if(Array.isArray(it.subs) && it.subs.length){
+          it.subs.forEach(s=>{
+            factRows.push({
+              ...baseRow,
+              id:'fact-'+f.id+'-'+(it.id||'x')+'-'+(s.id||uid()),
+              tipo:s.tipo||it.tipo||null,
+              marca:s.marca||it.marca||null,
+              cantidad:s.cant||s.qty||null,
+              price:parseFloat(s.price)||0,
+              currency:s.curr||it.curr||'CRC'
+            });
+          });
+        } else {
+          factRows.push({
+            ...baseRow,
+            id:'fact-'+f.id+'-'+(it.id||uid()),
+            tipo:it.tipo||null,
+            marca:it.marca||null,
+            cantidad:it.cant||null,
+            price:parseFloat(it.price)||0,
+            currency:it.curr||'CRC'
+          });
+        }
+      });
+    });
+  }catch(e){ console.warn('_loadMergedPurchases facturas:',e.message); }
+
+  // 3) Dedup: si ya está en purchase_history (mismo item+timestamp+precio+moneda), omitir versión de factura
+  const phKey = r => `${r.item_name}|${r.bought_at}|${r.price}|${r.currency}`;
+  const phKeys = new Set(phRows.map(phKey));
+  const factDedup = factRows.filter(r => !phKeys.has(phKey(r)));
+
+  return [...phRows, ...factDedup].sort((a,b)=>
+    new Date(b.bought_at||0) - new Date(a.bought_at||0)
+  );
+}
+
 async function adminLoadHistory(){
   const listEl=document.getElementById('admin-history-list');
   const countEl=document.getElementById('admin-history-count');
   listEl.innerHTML='<p style="color:var(--muted);font-size:.85rem">Cargando…</p>';
   try{
-    const scopeHouse = _adminScope==='house' ? CH?.shareCode : null;
-    let q=sb.from('purchase_history').select('*').order('bought_at',{ascending:false}).limit(500);
-    if(scopeHouse) q=q.eq('house_id',scopeHouse);
-    const {data,error}=await q;
-    if(error)throw error;
-    _allHistory=data||[];
-    countEl.textContent=scopeHouse?`${_allHistory.length} compras de esta casa`:`${_allHistory.length} compras registradas`;
+    // ⚠ Historial SIEMPRE por casa activa: cada casa lleva sus compras independientes.
+    const scopeHouse = CH?.shareCode || null;
+    if(!scopeHouse){
+      listEl.innerHTML='<p style="color:var(--muted);font-size:.85rem">Abrí una casa para ver sus compras.</p>';
+      countEl.textContent='';
+      return;
+    }
+    await flushPendingHistory();
+    _allHistory = await _loadMergedPurchases(scopeHouse);
+    countEl.textContent=`${_allHistory.length} compras de esta casa`;
     if(_histView==='records') adminRenderHistoryRecords(_allHistory);
     else adminRenderHistory(_allHistory);
   }catch(e){
     listEl.innerHTML=`<p style="color:#C05050;font-size:.85rem">Error: ${e.message}</p>`;
   }
+}
+
+// ══════════════════════ ANALÍTICAS — DIAGNÓSTICO ══════════════════════
+let _statsData = [];
+
+async function adminLoadStats(){
+  const loading = document.getElementById('stats-diag-loading');
+  const errEl   = document.getElementById('stats-diag-error');
+  const content = document.getElementById('stats-diag-content');
+  if(!loading||!content||!errEl) return;
+  loading.style.display='block';
+  loading.textContent='Sincronizando registros pendientes…';
+  errEl.style.display='none';
+  content.style.display='none';
+  try{
+    // Sube cualquier compra atrapada en localStorage antes de leer
+    await flushPendingHistory();
+    loading.textContent='Consultando base de datos…';
+    // ⚠ Las analíticas SIEMPRE se calculan por casa (cada casa independiente),
+    // aunque seas superadmin. Para ver otra casa, cambiate a esa casa.
+    const scopeHouse = CH?.shareCode || null;
+    if(!scopeHouse){
+      loading.style.display='none';
+      errEl.style.display='block';
+      errEl.textContent='Abrí una casa para ver sus analíticas.';
+      return;
+    }
+    let rows = await _loadMergedPurchases(scopeHouse);
+    // Filtrar a list_type='shopping' usando metadatos locales si existen
+    const shoppingListIds = new Set(
+      (UD?.lists||[])
+        .filter(l => l && l.type==='shopping' && !(l._tpl==='tpl-pagos' || l.name==='Pagos y Servicios'))
+        .map(l => l.id)
+    );
+    const pagosListIds = new Set(
+      (UD?.lists||[])
+        .filter(l => l && (l._tpl==='tpl-pagos' || l.name==='Pagos y Servicios'))
+        .map(l => l.id)
+    );
+    // Si tenemos información de listas locales y estamos en scope casa, filtrar
+    if (scopeHouse && (shoppingListIds.size>0 || pagosListIds.size>0)){
+      rows = rows.filter(r => !pagosListIds.has(r.list_id));
+    }
+    _statsData = rows;
+    _renderStatsDiagnostic(_statsData, scopeHouse, {shoppingListIds, pagosListIds});
+    loading.style.display='none';
+    content.style.display='block';
+  }catch(e){
+    loading.style.display='none';
+    errEl.style.display='block';
+    errEl.textContent = 'Error consultando purchase_history: ' + (e.message||e);
+  }
+}
+
+function _renderStatsDiagnostic(rows, scopeHouse){
+  const total = rows.length;
+  document.getElementById('diag-total').textContent = total.toLocaleString('es-CR');
+  document.getElementById('diag-total-sub').textContent = scopeHouse ? 'de tu casa (list_type=shopping)' : 'globales (list_type=shopping)';
+
+  // Rango de fechas
+  let minDate=null, maxDate=null;
+  rows.forEach(r=>{
+    if(!r.bought_at) return;
+    const d = new Date(r.bought_at);
+    if(!minDate||d<minDate) minDate=d;
+    if(!maxDate||d>maxDate) maxDate=d;
+  });
+  const fmt = d => d ? d.toLocaleDateString('es-CR',{year:'numeric',month:'short',day:'numeric'}) : '—';
+  document.getElementById('diag-range').textContent = minDate ? fmt(minDate) : '—';
+  document.getElementById('diag-range-sub').textContent = maxDate ? `hasta ${fmt(maxDate)}` : '';
+
+  // Compradores
+  const buyers = new Set(rows.map(r=>r.bought_by).filter(Boolean));
+  document.getElementById('diag-buyers').textContent = buyers.size;
+  document.getElementById('diag-buyers-sub').textContent = [...buyers].slice(0,3).join(', ') + (buyers.size>3?'…':'');
+
+  // Tiendas
+  const stores = new Set(rows.map(r=>r.store).filter(Boolean));
+  document.getElementById('diag-stores').textContent = stores.size;
+  document.getElementById('diag-stores-sub').textContent = [...stores].slice(0,3).join(', ') + (stores.size>3?'…':'');
+
+  // Artículos distintos
+  const items = new Set(rows.map(r=>r.item_name).filter(Boolean));
+  document.getElementById('diag-items').textContent = items.size;
+  document.getElementById('diag-items-sub').textContent = items.size>0?'nombres únicos':'';
+
+  // Monedas
+  const currencies = {};
+  rows.forEach(r=>{ const c=r.currency||'CRC'; currencies[c]=(currencies[c]||0)+1; });
+  const currKeys = Object.keys(currencies);
+  document.getElementById('diag-curr').textContent = currKeys.join(' · ') || '—';
+  document.getElementById('diag-curr-sub').textContent = currKeys.map(c=>`${c}: ${currencies[c]}`).join(' / ');
+
+  // Gasto acumulado por moneda
+  const totals = {};
+  rows.forEach(r=>{
+    const c = r.currency||'CRC';
+    const p = parseFloat(r.price)||0;
+    totals[c] = (totals[c]||0) + p;
+  });
+  const totalsEl = document.getElementById('diag-totals');
+  if(Object.keys(totals).length===0){
+    totalsEl.innerHTML = '<span style="color:var(--muted);font-size:.82rem">Sin montos registrados</span>';
+  } else {
+    totalsEl.innerHTML = Object.entries(totals).map(([c,v])=>{
+      const fmtV = c==='USD'
+        ? '$ '+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
+        : '₡ '+Math.round(v).toLocaleString('es-CR');
+      return `<div class="stats-diag-total-item"><span class="sdt-curr">${c}</span><span class="sdt-val">${fmtV}</span></div>`;
+    }).join('');
+  }
+
+  // Últimos 5
+  const recentEl = document.getElementById('diag-recent');
+  const recent = rows.slice(0,5);
+  if(recent.length===0){
+    recentEl.innerHTML = '<span style="color:var(--muted);font-size:.82rem">Sin registros</span>';
+  } else {
+    recentEl.innerHTML = recent.map(r=>{
+      const d = r.bought_at ? new Date(r.bought_at).toLocaleString('es-CR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+      const p = parseFloat(r.price)||0;
+      const c = r.currency||'CRC';
+      const price = c==='USD' ? '$'+p.toFixed(2) : '₡'+Math.round(p).toLocaleString('es-CR');
+      return `<div class="stats-diag-row">
+        <div class="sdr-item">${esc(r.item_name||'—')}</div>
+        <div class="sdr-meta">${esc(r.bought_by||'?')} · ${esc(r.store||'sin tienda')} · ${d}</div>
+        <div class="sdr-price">${price}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Banners
+  document.getElementById('diag-ok-banner').style.display    = total>0 ? 'block' : 'none';
+  document.getElementById('diag-empty-banner').style.display = total>0 ? 'none'  : 'block';
 }
 
 // Modo de vista del historial: 'summary' o 'records'
@@ -10458,9 +10791,6 @@ renderHome();
       <div id="admin-btn-wrap" style="display:none">
         <button class="btn" style="background:#1a1a2e;color:#e0c060;border:1.5px solid #4a4a6e;font-size:.85rem;padding:.5rem;width:100%" onclick="closeModals();openAdminPanel()">⚙️ Panel de Administrador</button>
       </div>
-      <div id="admin-stats-btn-wrap" style="display:none">
-        <button class="btn" style="background:var(--warm);color:var(--text);border:1.5px solid var(--sand);font-size:.85rem;padding:.5rem;width:100%" onclick="closeModals();openAdminPanel();adminTab('stats')">📈 Estadísticas</button>
-      </div>
       <button class="btn" style="background:var(--warm);color:var(--text);border:1.5px solid var(--sand);font-size:.85rem;padding:.5rem" onclick="closeModals();goToHouses()">🏠 Casas</button>
       <button class="btn" style="background:#fff0ee;color:#C05040;border:1.5px solid #e8c0b8;font-size:.85rem;padding:.5rem" onclick="doLogout()">🚪 Cerrar sesión</button>
       <button class="btn" style="background:#f0f4ff;color:#4060C0;border:1.5px solid #c0ccee;font-size:.85rem;padding:.5rem" onclick="clearLocalCache()">🔄 Limpiar caché local</button>
@@ -10571,6 +10901,12 @@ window.addEventListener('online',()=>{
   }
   // Procesar cambios pendientes offline
   setTimeout(processOfflineQueue, 1500); // esperar que la conexión se estabilice
+  // Subir compras atrapadas en localStorage (failsafe automático)
+  setTimeout(()=>{
+    if(typeof flushPendingHistory==='function' && CH){
+      flushPendingHistory().catch(()=>{});
+    }
+  }, 2500);
 });
 // Verificar estado al cargar
 initDarkMode();
@@ -10707,7 +11043,7 @@ if(!navigator.onLine) showBanner();
     <button id="atab-users"   class="ap-tab active" onclick="adminTab('users')">  <span class="ap-tab-icon">👥</span>Usuarios</button>
     <button id="atab-houses"  class="ap-tab"         onclick="adminTab('houses')"> <span class="ap-tab-icon">🏠</span>Casas</button>
     <button id="atab-history" class="ap-tab"         onclick="adminTab('history')"><span class="ap-tab-icon">📊</span>Compras</button>
-    <button id="atab-stats"   class="ap-tab"         onclick="adminTab('stats')">  <span class="ap-tab-icon">📈</span>Estadísticas</button>
+    <button id="atab-stats"   class="ap-tab"         onclick="adminTab('stats')">  <span class="ap-tab-icon">📈</span>Analíticas</button>
     <button id="atab-export"  class="ap-tab"         onclick="adminTab('export')"> <span class="ap-tab-icon">⬇️</span>Exportar</button>
     <button id="atab-cleanup" class="ap-tab"         onclick="adminTab('cleanup')"><span class="ap-tab-icon">🗑</span>Limpieza</button>
     <button id="atab-admins"  class="ap-tab"         onclick="adminTab('admins')"> <span class="ap-tab-icon">🛡️</span>Admins</button>
@@ -10825,6 +11161,79 @@ if(!navigator.onLine) showBanner();
       </div>
     </div>
 
+    <!-- ══ PANEL ANALÍTICAS ══ -->
+    <div id="apanel-stats" style="display:none">
+      <div class="ap-card">
+        <div class="ap-card-hdr">
+          <span class="ap-card-ttl">📈 Analíticas — Compras del Hogar</span>
+          <button class="ap-ghost-btn" onclick="adminLoadStats()" title="Recargar">↻</button>
+        </div>
+        <p style="font-size:.78rem;color:rgba(184,152,128,.6);margin-bottom:1rem">
+          Diagnóstico de datos disponibles para la analítica.
+          Se muestran únicamente las compras de listas tipo <em>shopping</em> de tu casa.
+        </p>
+
+        <div id="stats-diag-loading" style="text-align:center;padding:2rem;color:var(--muted);font-size:.85rem">
+          Consultando base de datos…
+        </div>
+
+        <div id="stats-diag-error" style="display:none;background:rgba(220,80,60,.1);border:1px solid rgba(220,80,60,.3);border-radius:10px;padding:1rem;color:#e89070;font-size:.82rem"></div>
+
+        <div id="stats-diag-content" style="display:none">
+          <div class="stats-diag-grid">
+            <div class="stats-diag-card">
+              <div class="stats-diag-label">Registros totales</div>
+              <div class="stats-diag-value" id="diag-total">—</div>
+              <div class="stats-diag-sub" id="diag-total-sub"></div>
+            </div>
+            <div class="stats-diag-card">
+              <div class="stats-diag-label">Rango de fechas</div>
+              <div class="stats-diag-value" id="diag-range">—</div>
+              <div class="stats-diag-sub" id="diag-range-sub"></div>
+            </div>
+            <div class="stats-diag-card">
+              <div class="stats-diag-label">Compradores únicos</div>
+              <div class="stats-diag-value" id="diag-buyers">—</div>
+              <div class="stats-diag-sub" id="diag-buyers-sub"></div>
+            </div>
+            <div class="stats-diag-card">
+              <div class="stats-diag-label">Tiendas únicas</div>
+              <div class="stats-diag-value" id="diag-stores">—</div>
+              <div class="stats-diag-sub" id="diag-stores-sub"></div>
+            </div>
+            <div class="stats-diag-card">
+              <div class="stats-diag-label">Artículos distintos</div>
+              <div class="stats-diag-value" id="diag-items">—</div>
+              <div class="stats-diag-sub" id="diag-items-sub"></div>
+            </div>
+            <div class="stats-diag-card">
+              <div class="stats-diag-label">Monedas</div>
+              <div class="stats-diag-value" id="diag-curr">—</div>
+              <div class="stats-diag-sub" id="diag-curr-sub"></div>
+            </div>
+          </div>
+
+          <div class="stats-diag-section">
+            <div class="stats-diag-section-ttl">💰 Gasto acumulado</div>
+            <div id="diag-totals" class="stats-diag-totals"></div>
+          </div>
+
+          <div class="stats-diag-section">
+            <div class="stats-diag-section-ttl">🧾 Últimos 5 registros</div>
+            <div id="diag-recent" class="stats-diag-recent"></div>
+          </div>
+
+          <div id="diag-ok-banner" style="display:none;margin-top:1rem;background:rgba(120,180,120,.1);border:1px solid rgba(120,180,120,.3);border-radius:10px;padding:.9rem;color:#90c890;font-size:.82rem">
+            ✓ Datos encontrados. Confirmá que se ven correctamente y seguimos con el dashboard premium (KPIs, gráficos y tabla detallada).
+          </div>
+
+          <div id="diag-empty-banner" style="display:none;margin-top:1rem;background:rgba(220,180,80,.1);border:1px solid rgba(220,180,80,.3);border-radius:10px;padding:.9rem;color:#e8c070;font-size:.82rem">
+            ⚠ No hay registros de compras (shopping) en esta casa todavía. El dashboard se verá vacío hasta que se confirme al menos una compra desde el carrito.
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ══ PANEL CONFIGURACIÓN GLOBAL ══ -->
     <div id="apanel-settings" style="display:none">
       <div class="ap-card">
@@ -10852,159 +11261,6 @@ if(!navigator.onLine) showBanner();
         </div>
       </div>
     </div>
-
-    <!-- ══ PANEL ESTADÍSTICAS ══ -->
-    <div id="apanel-stats" style="display:none">
-      <div id="stats-loading-inner" style="text-align:center;padding:2rem;color:var(--muted);font-size:.85rem">Cargando datos…</div>
-      <div id="stats-inner" style="display:none">
-
-        <!-- Toggle Compras / Pagos -->
-        <div class="stats-mode-toggle">
-          <button id="smode-compras" class="smode-btn active" onclick="switchStatsMode('compras')">🛒 Compras</button>
-          <button id="smode-pagos"   class="smode-btn"        onclick="switchStatsMode('pagos')">💳 Pagos y Servicios</button>
-        </div>
-
-        <!-- ══ COMPRAS ══ -->
-        <div id="stats-compras">
-          <div class="stats-subtabs">
-            <button class="stab active" onclick="switchStab(this,'s-resumen')">📊 Resumen</button>
-            <button class="stab" onclick="switchStab(this,'s-articulos')">🛒 Artículos</button>
-            <button class="stab" onclick="switchStab(this,'s-precios')">💰 Precios</button>
-            <button class="stab" onclick="switchStab(this,'s-operaciones')">🏪 Operaciones</button>
-          </div>
-
-          <!-- TAB 1: RESUMEN -->
-          <div class="spanel active" id="s-resumen">
-            <div id="s-kpis" style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-bottom:1rem"></div>
-            <div class="scard" id="s-alertas-card">
-              <div class="scard-ttl">⚠️ Próximos a necesitarse</div>
-              <div id="s-alertas"></div>
-            </div>
-            <div class="scard">
-              <div class="scard-ttl">📅 Gasto por sesión — verde baja · rojo sube</div>
-              <div style="position:relative;height:220px"><canvas id="sc-timeline"></canvas></div>
-            </div>
-            <div class="scard" id="s-best-store-card">
-              <div class="scard-ttl">🏷️ Tienda más conveniente — donde más barato sale la canasta</div>
-              <div id="s-best-store"></div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
-              <div class="scard"><div class="scard-ttl">🏆 Tienda favorita</div><div id="s-top-store"></div></div>
-              <div class="scard"><div class="scard-ttl">👑 Más compras</div><div id="s-top-user"></div></div>
-            </div>
-          </div>
-
-          <!-- TAB 2: ARTÍCULOS -->
-          <div class="spanel" id="s-articulos">
-            <div class="scard">
-              <div class="scard-ttl">Top artículos por variante (artículo · marca · tipo)</div>
-              <div style="position:relative;height:260px"><canvas id="sc-top"></canvas></div>
-            </div>
-            <div class="scard">
-              <div class="scard-ttl">💰 Gasto acumulado por artículo — top 10 por ₡ total invertido</div>
-              <div id="sc-spend-rank"></div>
-            </div>
-            <div class="scard">
-              <div class="scard-ttl">Frecuencia · intervalo promedio entre compras</div>
-              <div id="sc-freq"></div>
-            </div>
-          </div>
-
-          <!-- TAB 3: PRECIOS -->
-          <div class="spanel" id="s-precios">
-            <div class="scard">
-              <div class="scard-ttl">📊 Índice de inflación doméstica — variación promedio ponderada</div>
-              <div id="s-inflation"></div>
-            </div>
-            <div class="scard">
-              <div class="scard-ttl">Dónde comprar más barato — comparativo por tienda</div>
-              <div id="sp-compare"></div>
-            </div>
-            <div class="scard">
-              <div class="scard-ttl">Evolución de precios — ¿está subiendo o bajando?</div>
-              <div id="st-trend"></div>
-            </div>
-            <div class="scard">
-              <div class="scard-ttl">Rango min/max por artículo</div>
-              <div style="position:relative;height:240px"><canvas id="sc-prange"></canvas></div>
-            </div>
-          </div>
-
-          <!-- TAB 4: OPERACIONES -->
-          <div class="spanel" id="s-operaciones">
-            <div class="scard">
-              <div class="scard-ttl">📅 Gasto mensual — evolución mes a mes</div>
-              <div style="position:relative;height:200px"><canvas id="sc-monthly"></canvas></div>
-            </div>
-            <div class="scard">
-              <div class="scard-ttl">Gasto y visitas por tienda</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:center">
-                <div style="position:relative;height:200px"><canvas id="sc-stores"></canvas></div>
-                <div id="st-visits"></div>
-              </div>
-            </div>
-            <div class="scard">
-              <div class="scard-ttl">Actividad por usuario</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:center">
-                <div style="position:relative;height:200px"><canvas id="sc-users"></canvas></div>
-                <div id="su-spend"></div>
-              </div>
-            </div>
-            <div class="scard">
-              <div class="scard-ttl">Día de la semana más activo</div>
-              <div style="position:relative;height:180px"><canvas id="sc-weekday"></canvas></div>
-            </div>
-          </div>
-        </div><!-- /stats-compras -->
-
-        <!-- ══ PAGOS Y SERVICIOS ══ -->
-        <div id="stats-pagos" style="display:none">
-          <div class="stats-subtabs">
-            <button class="stab active" onclick="switchStabP(this,'sp-resumen')">📊 Resumen</button>
-            <button class="stab" onclick="switchStabP(this,'sp-servicios')">🧾 Servicios</button>
-            <button class="stab" onclick="switchStabP(this,'sp-evolucion')">📈 Evolución</button>
-          </div>
-
-          <!-- TAB P1: RESUMEN -->
-          <div class="spanel active" id="sp-resumen">
-            <div id="sp-kpis" style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-bottom:1rem"></div>
-            <div class="scard">
-              <div class="scard-ttl">📅 Gasto mensual en servicios</div>
-              <div style="position:relative;height:200px"><canvas id="spc-monthly"></canvas></div>
-            </div>
-            <div class="scard">
-              <div class="scard-ttl">💳 Servicios más costosos</div>
-              <div id="sp-top-services"></div>
-            </div>
-          </div>
-
-          <!-- TAB P2: SERVICIOS -->
-          <div class="spanel" id="sp-servicios">
-            <div class="scard">
-              <div class="scard-ttl">Gasto acumulado por servicio</div>
-              <div id="sp-spend-rank"></div>
-            </div>
-            <div class="scard">
-              <div class="scard-ttl">Frecuencia de pago por servicio</div>
-              <div id="sp-freq"></div>
-            </div>
-          </div>
-
-          <!-- TAB P3: EVOLUCIÓN -->
-          <div class="spanel" id="sp-evolucion">
-            <div class="scard">
-              <div class="scard-ttl">📊 Tendencia de precio por servicio — ¿está subiendo?</div>
-              <div id="sp-trend"></div>
-            </div>
-            <div class="scard">
-              <div class="scard-ttl">Rango min/max por servicio</div>
-              <div style="position:relative;height:220px"><canvas id="spc-prange"></canvas></div>
-            </div>
-          </div>
-        </div><!-- /stats-pagos -->
-
-      </div>
-    </div>
   </div>
 </div>
 
@@ -11020,775 +11276,6 @@ if(!navigator.onLine) showBanner();
     </div>
   </div>
 </div>
-
-<style>
-/* ══ ESTADÍSTICAS ══ */
-/* Toggle Compras / Pagos */
-.stats-mode-toggle{
-  display:flex;gap:.35rem;margin-bottom:1.1rem;
-  background:rgba(255,255,255,.04);border:1px solid rgba(212,150,60,.18);
-  border-radius:24px;padding:.28rem;width:fit-content;
-}
-.smode-btn{
-  font-family:'Montserrat',sans-serif;font-size:.78rem;font-weight:700;
-  padding:.38rem 1rem;border-radius:20px;border:none;cursor:pointer;
-  background:none;color:rgba(184,152,128,.6);transition:all .22s;letter-spacing:.02em;
-}
-.smode-btn.active{
-  background:linear-gradient(135deg,#C4714A,#A85A35);color:white;
-  box-shadow:0 2px 10px rgba(196,113,74,.35);
-}
-.smode-btn:hover:not(.active){color:#D4963C;}
-
-/* Sub-tabs */
-.stats-subtabs{
-  display:flex;gap:.35rem;flex-wrap:wrap;
-  margin-bottom:1.2rem;padding-bottom:.8rem;
-  border-bottom:1px solid var(--warm);
-}
-.stab{font-family:'Montserrat',sans-serif;font-size:.75rem;font-weight:600;padding:.3rem .7rem;
-  border-radius:20px;border:1.5px solid var(--sand);background:var(--bg-card);color:var(--muted);
-  cursor:pointer;transition:all .2s;}
-.stab.active{background:var(--tc);color:white;border-color:var(--tc);}
-.stab:hover:not(.active){border-color:var(--tc);color:var(--tc);}
-.spanel{display:none;}
-.spanel.active{display:block;animation:sfade .25s ease;}
-@keyframes sfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.scard{background:var(--warm);border:1px solid var(--sand);border-radius:14px;
-  padding:1rem;margin-bottom:.9rem;}
-.scard-ttl{font-size:.65rem;letter-spacing:.12em;text-transform:uppercase;
-  color:var(--muted);font-weight:700;margin-bottom:.85rem;}
-.skpi{background:var(--bg-card);border:1px solid var(--sand);border-radius:12px;padding:.85rem;text-align:center;}
-.skpi-alert{border-color:rgba(192,112,48,.5);background:rgba(192,112,48,.07);}
-.skpi-val{font-size:1.5rem;font-weight:700;color:var(--tc);letter-spacing:-.02em;line-height:1;}
-.skpi-lbl{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:.25rem;}
-.sspend-row{display:flex;align-items:center;gap:.6rem;padding:.4rem 0;border-bottom:1px solid var(--warm);}
-.sspend-row:last-child{border-bottom:none;}
-.sspend-rank{font-size:.65rem;font-weight:700;color:var(--muted);width:1.1rem;text-align:right;flex-shrink:0;}
-.sspend-name{font-size:.78rem;color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.sspend-bar-wrap{width:60px;background:var(--warm);border-radius:4px;height:5px;flex-shrink:0;}
-.sspend-bar{height:100%;border-radius:4px;background:var(--tc);}
-.sspend-amt{font-size:.72rem;font-weight:700;color:var(--gold);min-width:72px;text-align:right;flex-shrink:0;}
-.sfreq{display:flex;align-items:center;gap:.6rem;padding:.45rem 0;
-  border-bottom:1px solid rgba(0,0,0,.05);}
-.sfreq:last-child{border-bottom:none;}
-.sfreq-name{font-size:.78rem;color:var(--text);min-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.sfreq-bar-bg{flex:1;height:5px;background:var(--sand);border-radius:3px;overflow:hidden;}
-.sfreq-bar{height:100%;background:var(--tc);border-radius:3px;transition:width .5s ease;}
-.sfreq-cnt{font-size:.7rem;color:var(--muted);white-space:nowrap;min-width:50px;text-align:right;}
-.sprice-row{padding:.5rem 0;border-bottom:1px solid rgba(0,0,0,.05);}
-.sprice-row:last-child{border-bottom:none;}
-.sprice-name{font-size:.8rem;font-weight:600;color:var(--text);margin-bottom:.3rem;}
-.sprice-chips{display:flex;gap:.3rem;flex-wrap:wrap;}
-.sprice-chip{font-size:.65rem;padding:.12rem .45rem;border-radius:20px;
-  border:1.5px solid var(--sand);background:var(--bg-card);color:var(--text);}
-.sprice-chip.cheap{border-color:#5a9a6a;background:#f0f8f2;color:#3a7a4a;}
-.sprice-chip.expensive{border-color:#c07060;background:#fff4f2;color:#c05040;}
-.suser-row{display:flex;align-items:center;gap:.65rem;padding:.5rem 0;
-  border-bottom:1px solid rgba(0,0,0,.05);}
-.suser-row:last-child{border-bottom:none;}
-.suser-av{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;
-  justify-content:center;font-size:.7rem;font-weight:700;color:white;flex-shrink:0;}
-.suser-name{font-size:.8rem;color:var(--text);flex:1;}
-.suser-cnt{font-size:.72rem;color:var(--muted);}
-.strend-row{padding:.45rem 0;border-bottom:1px solid rgba(0,0,0,.05);}
-.strend-row:last-child{border-bottom:none;}
-.strend-name{font-size:.78rem;font-weight:600;color:var(--text);}
-.strend-prices{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem;}
-.strend-entry{font-size:.65rem;color:var(--muted);background:var(--bg-card);border:1px solid var(--sand);
-  border-radius:8px;padding:.1rem .4rem;}
-</style>
-
-<script>
-// ══ ESTADÍSTICAS ══
-let _statsD=null;       // solo compras
-let _statsPagosD=null;  // solo pagos y servicios
-let _statsCharts={};
-let _statsMode='compras';
-
-function switchStatsMode(mode){
-  _statsMode=mode;
-  document.getElementById('smode-compras').classList.toggle('active',mode==='compras');
-  document.getElementById('smode-pagos').classList.toggle('active',mode==='pagos');
-  document.getElementById('stats-compras').style.display=mode==='compras'?'block':'none';
-  document.getElementById('stats-pagos').style.display=mode==='pagos'?'block':'none';
-  if(mode==='pagos') renderSPagosResumen();
-}
-
-function switchStab(btn,panelId){
-  // Solo afecta stabs dentro de stats-compras
-  const container=document.getElementById('stats-compras');
-  container.querySelectorAll('.stab').forEach(b=>b.classList.remove('active'));
-  container.querySelectorAll('.spanel').forEach(p=>p.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById(panelId).classList.add('active');
-  renderStabPanel(panelId);
-}
-
-function switchStabP(btn,panelId){
-  const container=document.getElementById('stats-pagos');
-  container.querySelectorAll('.stab').forEach(b=>b.classList.remove('active'));
-  container.querySelectorAll('.spanel').forEach(p=>p.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById(panelId).classList.add('active');
-  renderStabPPanel(panelId);
-}
-
-function renderStabPPanel(id){
-  if(!_statsPagosD) return;
-  if(id==='sp-resumen') renderSPagosResumen();
-  else if(id==='sp-servicios') renderSPagosServicios();
-  else if(id==='sp-evolucion') renderSPagosEvolucion();
-}
-
-async function adminLoadStats(){
-  document.getElementById('stats-loading-inner').style.display='block';
-  document.getElementById('stats-inner').style.display='none';
-  Object.values(_statsCharts).forEach(c=>{try{c.destroy();}catch(e){}});
-  _statsCharts={};
-  if(!window.Chart){
-    await new Promise((res,rej)=>{
-      const s=document.createElement('script');
-      s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
-      s.onload=res;s.onerror=rej;
-      document.head.appendChild(s);
-    }).catch(()=>{});
-  }
-  try{
-    const {data}=await sb.from('purchase_history')
-      .select('*').eq('house_id',CH.shareCode)
-      .order('bought_at',{ascending:true});
-    _statsD=(data||[]).filter(r=>r.list_type!=='pagos');
-    _statsPagosD=(data||[]).filter(r=>r.list_type==='pagos');
-  }catch(e){_statsD=[];_statsPagosD=[];}
-  document.getElementById('stats-loading-inner').style.display='none';
-  document.getElementById('stats-inner').style.display='block';
-  // Resetear al modo compras por defecto
-  switchStatsMode('compras');
-  const cContainer=document.getElementById('stats-compras');
-  cContainer.querySelectorAll('.stab').forEach((b,i)=>b.classList.toggle('active',i===0));
-  cContainer.querySelectorAll('.spanel').forEach((p,i)=>p.classList.toggle('active',i===0));
-  renderStabPanel('s-resumen');
-}
-
-function renderStabPanel(id){
-  if(!_statsD) return;
-  if(id==='s-resumen') renderSResumen();
-  else if(id==='s-articulos') renderSArticulos();
-  else if(id==='s-precios') renderSPrecios();
-  else if(id==='s-operaciones') renderSOperaciones();
-}
-
-const SCOLS=['#4A8C6A','#4A7A8C','#8C6A4A','#7A4A8C','#8C4A60','#4A8C80','#8C804A','#6A8C4A'];
-const SCOLS_ALPHA=o=>SCOLS.map(c=>c+o);
-const DIAS=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-const MESES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-
-function fmtP(n,curr){
-  if(!n&&n!==0) return '—';
-  return curr==='USD'?'$'+Number(n).toFixed(2):'₡'+Math.round(n).toLocaleString('es-CR');
-}
-function mkChart(id,type,labels,datasets,opts={}){
-  if(_statsCharts[id]){try{_statsCharts[id].destroy();}catch(e){}}
-  const ctx=document.getElementById(id);
-  if(!ctx||!labels.length) return;
-  const baseScales=type==='pie'||type==='doughnut'?{}:{
-    x:{ticks:{font:{family:'Geist',size:9},color:'#8A9890'},grid:{color:'rgba(0,0,0,.04)'}},
-    y:{ticks:{font:{family:'Geist',size:9},color:'#8A9890'},grid:{color:'rgba(0,0,0,.04)'}}
-  };
-  _statsCharts[id]=new Chart(ctx,{
-    type,data:{labels,datasets},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{labels:{font:{family:'Geist',size:10},color:'#6A8070',boxWidth:10}}},
-      scales:baseScales,...opts}
-  });
-}
-function itemKey(r){
-  return[r.item_name,r.marca,r.tipo].filter(Boolean).join(' · ');
-}
-function itemLabelPlain(r){
-  return[r.item_name,r.marca,r.tipo,r.cantidad].filter(Boolean).join(' · ');
-}
-
-// ══ TAB 1: RESUMEN ══
-function renderSResumen(){
-  const d=_statsD;
-  // KPIs
-  const totalCRC=d.filter(r=>r.currency==='CRC').reduce((s,r)=>s+(parseFloat(r.price)||0),0);
-  const uItems=new Set(d.map(r=>r.item_name)).size;
-  const uVariants=new Set(d.map(r=>itemKey(r))).size;
-  const uStores=new Set(d.filter(r=>r.store).map(r=>r.store)).size;
-  const sessions=new Set(d.map(r=>r.bought_at?.slice(0,10))).size||1;
-  const avgSession=d.length?(totalCRC/sessions):0;
-  const pendFacs=_facturas.filter(f=>f.status==='pendiente');
-  const pendTotal=pendFacs.reduce((s,f)=>s+(f.total_crc||0),0);
-  document.getElementById('s-kpis').innerHTML=`
-    <div class="skpi"><div class="skpi-val">${d.length}</div><div class="skpi-lbl">Compras totales</div></div>
-    <div class="skpi"><div class="skpi-val">${uItems} <span style="font-size:.8rem;color:var(--muted)">(${uVariants} var.)</span></div><div class="skpi-lbl">Artículos únicos</div></div>
-    <div class="skpi"><div class="skpi-val">${uStores}</div><div class="skpi-lbl">Tiendas visitadas</div></div>
-    <div class="skpi"><div class="skpi-val" style="font-size:.95rem">${fmtP(totalCRC,'CRC')}</div><div class="skpi-lbl">Gasto total ₡</div></div>
-    <div class="skpi"><div class="skpi-val" style="font-size:.95rem">${fmtP(Math.round(avgSession),'CRC')}</div><div class="skpi-lbl">Promedio por sesión</div></div>
-    <div class="skpi ${pendFacs.length?'skpi-alert':''}"><div class="skpi-val" style="font-size:${pendTotal>0?'.9rem':'1.5rem'};color:${pendFacs.length?'#C07030':'var(--tc)'}">${pendFacs.length?fmtP(Math.round(pendTotal),'CRC'):pendFacs.length}</div><div class="skpi-lbl">Pagos pendientes${pendFacs.length?` (${pendFacs.length})`:''}</div></div>
-  `;
-  // Alertas — artículos que superaron su intervalo promedio desde la última compra
-  const dates={};
-  d.forEach(r=>{
-    const k=itemKey(r);
-    if(!dates[k])dates[k]=[];
-    dates[k].push(new Date(r.bought_at).getTime());
-  });
-  const now=Date.now();
-  const alerts=Object.entries(dates).map(([k,ts])=>{
-    ts.sort((a,b)=>a-b);
-    if(ts.length<2) return null;
-    const diffs=ts.slice(1).map((t,i)=>(t-ts[i])/86400000);
-    const avg=diffs.reduce((s,d)=>s+d,0)/diffs.length;
-    const daysSince=(now-ts[ts.length-1])/86400000;
-    const pct=daysSince/avg;
-    return{key:k,avg:Math.round(avg),daysSince:Math.round(daysSince),pct};
-  }).filter(a=>a&&a.pct>=0.7).sort((a,b)=>b.pct-a.pct).slice(0,5);
-  document.getElementById('s-alertas').innerHTML=alerts.length?alerts.map(a=>`
-    <div style="display:flex;align-items:center;gap:.6rem;padding:.4rem 0;border-bottom:1px solid rgba(0,0,0,.05)">
-      <div style="flex:1;font-size:.78rem;color:var(--text)">${a.key}</div>
-      <div style="font-size:.7rem;color:${a.pct>=1?'#C05050':'#C07030'};white-space:nowrap">
-        ${a.pct>=1?'⚠️ Hace '+a.daysSince+'d':'🕐 '+a.daysSince+'d / c/'+a.avg+'d'}
-      </div>
-      <div style="width:50px;height:5px;background:var(--sand);border-radius:3px;overflow:hidden;flex-shrink:0">
-        <div style="height:100%;width:${Math.min(a.pct*100,100)}%;background:${a.pct>=1?'#C05050':'#C07030'};border-radius:3px"></div>
-      </div>
-    </div>`).join(''):`<p style="font-size:.8rem;color:var(--muted)">Todo en orden — ningún artículo supera su intervalo habitual.</p>`;
-
-  // Línea de tiempo global
-  const byDay={};
-  d.filter(r=>r.currency==='CRC'&&r.price).forEach(r=>{
-    const day=r.bought_at?.slice(0,10)||'';
-    if(day) byDay[day]=(byDay[day]||0)+(parseFloat(r.price)||0);
-  });
-  const days=Object.keys(byDay).sort();
-  const dayVals=days.map(day=>Math.round(byDay[day]));
-  const ptColors=dayVals.map((v,i)=>i===0?'#4A8C6A':v<dayVals[i-1]?'#4A8C6A':'#C05050');
-  mkChart('sc-timeline','line',
-    days.map(day=>{const dt=new Date(day+'T12:00:00');return dt.toLocaleDateString('es-CR',{month:'short',day:'numeric'});}),
-    [{label:'Gasto ₡',data:dayVals,borderColor:'#4A8C6A',backgroundColor:'rgba(74,140,106,.08)',
-      borderWidth:2,fill:true,tension:.3,pointBackgroundColor:ptColors,pointBorderColor:ptColors,pointRadius:5}],
-    {plugins:{legend:{display:false},tooltip:{callbacks:{
-      title:([{dataIndex:i}])=>days[i],
-      label:({raw,dataIndex:i})=>{
-        const prev=i>0?dayVals[i-1]:null;
-        const diff=prev?Math.round(raw-prev):null;
-        return[fmtP(raw,'CRC'),prev?(diff>0?'▲ +':'▼ ')+fmtP(Math.abs(diff),'CRC')+' vs anterior':'Primera compra'].filter(Boolean);
-      }
-    }}}}
-  );
-  // Top tienda y usuario
-  const scnt={};const ucnt={};const ucolor={};
-  d.forEach((r,i)=>{
-    if(r.store) scnt[r.store]=(scnt[r.store]||0)+1;
-    if(r.bought_by){const _isNew=!ucolor[r.bought_by];ucnt[r.bought_by]=(ucnt[r.bought_by]||0)+1;if(_isNew)ucolor[r.bought_by]=SCOLS[(Object.keys(ucolor).length-1)%SCOLS.length];}
-  });
-  const topStore=Object.entries(scnt).sort((a,b)=>b[1]-a[1])[0];
-  const topUser=Object.entries(ucnt).sort((a,b)=>b[1]-a[1])[0];
-  document.getElementById('s-top-store').innerHTML=topStore?`
-    <div style="text-align:center;padding:.5rem 0">
-      <div style="font-size:2rem">🏪</div>
-      <div style="font-size:1rem;font-weight:700;color:var(--tc);margin:.3rem 0">${topStore[0]}</div>
-      <div style="font-size:.72rem;color:var(--muted)">${topStore[1]} visitas</div>
-    </div>`:'<p style="font-size:.8rem;color:var(--muted)">Sin datos</p>';
-  document.getElementById('s-top-user').innerHTML=topUser?`
-    <div style="text-align:center;padding:.5rem 0">
-      <div style="width:36px;height:36px;border-radius:50%;background:${ucolor[topUser[0]]};color:white;
-        font-size:.9rem;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto .4rem">
-        ${topUser[0][0].toUpperCase()}</div>
-      <div style="font-size:1rem;font-weight:700;color:var(--tc)">${topUser[0]}</div>
-      <div style="font-size:.72rem;color:var(--muted)">${topUser[1]} compras</div>
-    </div>`:'<p style="font-size:.8rem;color:var(--muted)">Sin datos</p>';
-
-  // ── Tienda más conveniente ──────────────────────────────────────────────
-  // Para cada variante con precio en ≥2 tiendas, calcula precio promedio por tienda.
-  // La tienda con el menor promedio "gana" esa variante.
-  // Resultado: ranking de tiendas por victorias + ahorro promedio vs la más cara.
-  (function(){
-    const byVS={};
-    d.filter(r=>r.store&&r.price&&r.currency==='CRC').forEach(r=>{
-      const k=itemKey(r);
-      if(!byVS[k]) byVS[k]={};
-      if(!byVS[k][r.store]) byVS[k][r.store]=[];
-      byVS[k][r.store].push(parseFloat(r.price)||0);
-    });
-    // wins[store] = nº de variantes donde esa tienda tiene el precio promedio más bajo
-    const wins={};const savings=[];
-    Object.values(byVS).forEach(stores=>{
-      const avgs=Object.entries(stores).map(([s,ps])=>({s,avg:ps.reduce((a,b)=>a+b,0)/ps.length}));
-      if(avgs.length<2) return;
-      avgs.sort((a,b)=>a.avg-b.avg);
-      const winner=avgs[0].s;
-      wins[winner]=(wins[winner]||0)+1;
-      savings.push(avgs[avgs.length-1].avg-avgs[0].avg); // ahorro vs más cara
-    });
-    const ranked=Object.entries(wins).sort((a,b)=>b[1]-a[1]);
-    const total=Object.values(wins).reduce((a,b)=>a+b,0)||1;
-    const avgSaving=savings.length?Math.round(savings.reduce((a,b)=>a+b,0)/savings.length):0;
-    const el=document.getElementById('s-best-store');
-    if(!ranked.length){
-      el.innerHTML='<p style="font-size:.8rem;color:var(--muted);padding:.4rem 0">Necesita compras en ≥2 tiendas para comparar.</p>';
-      return;
-    }
-    const [bestStore,bestWins]=ranked[0];
-    const pct=Math.round(bestWins/total*100);
-    el.innerHTML=`
-      <div style="display:flex;align-items:center;gap:1rem;padding:.6rem 0 .8rem">
-        <div style="font-size:2.4rem;line-height:1">🏷️</div>
-        <div style="flex:1">
-          <div style="font-size:1.15rem;font-weight:700;color:var(--tc);line-height:1.1">${bestStore}</div>
-          <div style="font-size:.72rem;color:var(--muted);margin-top:.25rem">
-            Precio más bajo en <strong style="color:var(--gold)">${bestWins} de ${total}</strong> producto${total!==1?'s':''} comparados (${pct}%)
-            ${avgSaving>0?`· ahorro promedio <strong style="color:#4A8C6A">₡${avgSaving.toLocaleString('es-CR')}</strong> vs la más cara`:''}
-          </div>
-        </div>
-      </div>
-      ${ranked.length>1?`<div style="display:flex;flex-direction:column;gap:.3rem;border-top:1px solid var(--warm);padding-top:.6rem">
-        ${ranked.map(([s,w],i)=>{
-          const p=Math.round(w/total*100);
-          return`<div style="display:flex;align-items:center;gap:.5rem">
-            <span style="font-size:.7rem;color:var(--muted);width:1rem;text-align:right">${i+1}</span>
-            <div style="flex:1;background:var(--warm);border-radius:4px;height:6px;overflow:hidden">
-              <div style="height:100%;width:${p}%;background:${i===0?'#4A8C6A':'#C07030'};border-radius:4px;transition:width .5s"></div>
-            </div>
-            <span style="font-size:.72rem;font-weight:600;color:${i===0?'#4A8C6A':'var(--text)'};min-width:6rem">${s}</span>
-            <span style="font-size:.68rem;color:var(--muted)">${w} ganadas</span>
-          </div>`;
-        }).join('')}
-      </div>`:''}
-    `;
-  })();
-}
-
-// ══ TAB 2: ARTÍCULOS ══
-function renderSArticulos(){
-  const d=_statsD;
-  const cnt={};const cntLabel={};
-  d.forEach(r=>{const k=itemKey(r);cnt[k]=(cnt[k]||0)+1;cntLabel[k]=itemLabelPlain(r);});
-  const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,12);
-  mkChart('sc-top','bar',
-    top.map(([k])=>{const l=cntLabel[k];return l.length>20?l.slice(0,18)+'…':l;}),
-    [{data:top.map(([,c])=>c),backgroundColor:SCOLS_ALPHA('CC'),borderColor:SCOLS,borderWidth:1.5,borderRadius:6}],
-    {indexAxis:'y',plugins:{legend:{display:false}},scales:{
-      x:{ticks:{stepSize:1,font:{family:'Geist',size:9},color:'#8A9890'},grid:{color:'rgba(0,0,0,.04)'}},
-      y:{ticks:{font:{family:'Geist',size:9},color:'#8A9890'},grid:{display:false}}
-    }}
-  );
-  // Gasto acumulado por artículo (solo CRC)
-  const gasto={};const gastoLabel={};
-  d.filter(r=>r.currency==='CRC'&&r.price).forEach(r=>{
-    const k=itemKey(r);
-    gasto[k]=(gasto[k]||0)+(parseFloat(r.price)||0);
-    gastoLabel[k]=itemLabelPlain(r);
-  });
-  const topGasto=Object.entries(gasto).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  const maxG=topGasto[0]?topGasto[0][1]:1;
-  const fmtCRC2=n=>'₡'+Math.round(n).toLocaleString('es-CR');
-  document.getElementById('sc-spend-rank').innerHTML=topGasto.length?topGasto.map(([k,total],i)=>`
-    <div class="sspend-row">
-      <span class="sspend-rank">${i+1}</span>
-      <span class="sspend-name" title="${gastoLabel[k]}">${gastoLabel[k]}</span>
-      <div class="sspend-bar-wrap"><div class="sspend-bar" style="width:${Math.round(total/maxG*100)}%;background:${SCOLS[i%SCOLS.length]}"></div></div>
-      <span class="sspend-amt">${fmtCRC2(total)}</span>
-    </div>`).join(''):`<p style="font-size:.82rem;color:var(--muted);padding:.5rem 0">Sin datos de precios aún.</p>`;
-
-  const dates={};const dLabel={};
-  d.forEach(r=>{const k=itemKey(r);if(!dates[k])dates[k]=[];dates[k].push(new Date(r.bought_at).getTime());dLabel[k]=itemLabelPlain(r);});
-  const freq=Object.entries(dates).map(([k,ts])=>{
-    ts.sort((a,b)=>a-b);
-    let avg=null;
-    if(ts.length>1){const diffs=ts.slice(1).map((t,i)=>(t-ts[i])/86400000);avg=Math.round(diffs.reduce((s,d)=>s+d,0)/diffs.length);}
-    return{name:dLabel[k],count:ts.length,avg};
-  }).sort((a,b)=>b.count-a.count).slice(0,15);
-  const mx=Math.max(...freq.map(f=>f.count),1);
-  document.getElementById('sc-freq').innerHTML=freq.map(f=>`
-    <div class="sfreq">
-      <div class="sfreq-name" title="${f.name}">${f.name}</div>
-      <div class="sfreq-bar-bg"><div class="sfreq-bar" style="width:${(f.count/mx)*100}%"></div></div>
-      <div class="sfreq-cnt">${f.count}x${f.avg?` · c/${f.avg}d`:''}</div>
-    </div>`).join('');
-}
-
-// ══ TAB 3: PRECIOS ══
-function renderSPrecios(){
-  const d=_statsD;
-  // Índice de inflación doméstica
-  (function(){
-    const byVDay={};const vLabels={};
-    d.filter(r=>r.currency==='CRC'&&r.price).forEach(r=>{
-      const k=itemKey(r);const day=r.bought_at?.slice(0,10)||'';
-      if(!byVDay[k])byVDay[k]={};
-      byVDay[k][day]=parseFloat(r.price)||0;
-      vLabels[k]=itemLabelPlain(r);
-    });
-    // Solo variantes con 2+ compras en días distintos
-    const diffs=Object.entries(byVDay).filter(([,ds])=>Object.keys(ds).length>1).map(([k,ds])=>{
-      const sorted=Object.keys(ds).sort();
-      const first=ds[sorted[0]],last=ds[sorted[sorted.length-1]];
-      return((last-first)/first)*100;
-    });
-    const el=document.getElementById('s-inflation');
-    if(!diffs.length){
-      el.innerHTML='<p style="font-size:.82rem;color:var(--muted);padding:.5rem 0">Se necesitan 2+ compras del mismo artículo para calcular.</p>';
-      return;
-    }
-    const avg=diffs.reduce((s,v)=>s+v,0)/diffs.length;
-    const rising=diffs.filter(v=>v>2).length;
-    const falling=diffs.filter(v=>v<-2).length;
-    const stable=diffs.length-rising-falling;
-    const color=avg>5?'#C05050':avg<-5?'#4A8C6A':'#C07030';
-    el.innerHTML=`
-      <div style="display:flex;align-items:center;gap:1.2rem;padding:.4rem 0 .8rem">
-        <div style="text-align:center;flex-shrink:0">
-          <div style="font-size:2rem;font-weight:800;color:${color};letter-spacing:-.03em;line-height:1">
-            ${avg>0?'+':''}${avg.toFixed(1)}%
-          </div>
-          <div style="font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:.2rem">variación promedio</div>
-        </div>
-        <div style="flex:1;display:flex;flex-direction:column;gap:.35rem">
-          <div style="display:flex;align-items:center;gap:.5rem">
-            <span style="font-size:.7rem;color:#C05050;width:1.2rem">▲</span>
-            <div style="flex:1;background:var(--warm);border-radius:3px;height:6px">
-              <div style="height:100%;width:${Math.round(rising/diffs.length*100)}%;background:#C05050;border-radius:3px"></div>
-            </div>
-            <span style="font-size:.7rem;color:var(--muted);min-width:2.5rem">${rising} art.</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:.5rem">
-            <span style="font-size:.7rem;color:#4A8C6A;width:1.2rem">▼</span>
-            <div style="flex:1;background:var(--warm);border-radius:3px;height:6px">
-              <div style="height:100%;width:${Math.round(falling/diffs.length*100)}%;background:#4A8C6A;border-radius:3px"></div>
-            </div>
-            <span style="font-size:.7rem;color:var(--muted);min-width:2.5rem">${falling} art.</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:.5rem">
-            <span style="font-size:.7rem;color:var(--muted);width:1.2rem">→</span>
-            <div style="flex:1;background:var(--warm);border-radius:3px;height:6px">
-              <div style="height:100%;width:${Math.round(stable/diffs.length*100)}%;background:#C07030;border-radius:3px"></div>
-            </div>
-            <span style="font-size:.7rem;color:var(--muted);min-width:2.5rem">${stable} art.</span>
-          </div>
-        </div>
-      </div>
-      <div style="font-size:.72rem;color:var(--muted);padding-top:.4rem;border-top:1px solid var(--warm)">
-        Basado en <strong>${diffs.length}</strong> artículo${diffs.length!==1?'s':''} con historial de precios
-        · ${avg>5?'⚠️ Canasta con tendencia alcista':avg<-5?'✅ Canasta con tendencia a la baja':'Precios relativamente estables'}
-      </div>
-    `;
-  })();
-  // Comparativo por tienda
-  const byVS={};
-  d.filter(r=>r.store&&r.price).forEach(r=>{
-    const k=itemKey(r);
-    if(!byVS[k])byVS[k]={label:itemLabelPlain(r),stores:{}};
-    if(!byVS[k].stores[r.store])byVS[k].stores[r.store]=[];
-    byVS[k].stores[r.store].push({price:parseFloat(r.price),curr:r.currency||'CRC'});
-  });
-  const rows=Object.values(byVS).sort((a,b)=>Object.keys(b.stores).length-Object.keys(a.stores).length);
-  document.getElementById('sp-compare').innerHTML=rows.length?rows.map(({label,stores})=>{
-    const avgs=Object.entries(stores).map(([store,ps])=>({
-      store,avg:ps.reduce((s,p)=>s+p.price,0)/ps.length,curr:ps[0].curr,count:ps.length
-    })).sort((a,b)=>a.avg-b.avg);
-    return`<div class="sprice-row">
-      <div class="sprice-name">${label}</div>
-      <div class="sprice-chips">
-        ${avgs.map((a,i)=>`<span class="sprice-chip ${i===0&&avgs.length>1?'cheap':i===avgs.length-1&&avgs.length>1?'expensive':''}">${i===0&&avgs.length>1?'💚 ':i===avgs.length-1&&avgs.length>1?'💸 ':''}${a.store}: ${fmtP(a.avg,a.curr)}${a.count>1?` ×${a.count}`:''}</span>`).join('')}
-      </div>
-    </div>`;
-  }).join(''):`<p style="font-size:.82rem;color:var(--muted);padding:.5rem 0">Necesita más compras en diferentes tiendas para comparar.</p>`;
-  // Evolución de precios
-  const byVDay={};const vLabels={};
-  d.filter(r=>r.currency==='CRC'&&r.price).forEach(r=>{
-    const k=itemKey(r);const day=r.bought_at?.slice(0,10)||'';
-    if(!byVDay[k])byVDay[k]={};
-    byVDay[k][day]=parseFloat(r.price)||0;
-    vLabels[k]=itemLabelPlain(r);
-  });
-  const trending=Object.entries(byVDay).filter(([,ds])=>Object.keys(ds).length>1)
-    .map(([k,ds])=>{
-      const sortedDays=Object.keys(ds).sort();
-      const prices=sortedDays.map(d=>({date:d,price:ds[d]}));
-      const diff=((prices[prices.length-1].price-prices[0].price)/prices[0].price)*100;
-      return{label:vLabels[k],prices,diff};
-    }).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff)).slice(0,10);
-  document.getElementById('st-trend').innerHTML=trending.length?trending.map(({label,prices,diff})=>`
-    <div class="strend-row">
-      <div class="strend-name">${label}
-        <span style="font-size:.65rem;padding:.1rem .4rem;border-radius:10px;margin-left:.3rem;
-          background:${diff>5?'#fff0ee':diff<-5?'#f0f8f2':'var(--warm)'};
-          color:${diff>5?'#C05050':diff<-5?'#3a7a4a':'var(--muted)'}">
-          ${diff>0?'▲':'▼'} ${Math.abs(diff).toFixed(0)}%
-        </span>
-      </div>
-      <div class="strend-prices">
-        ${prices.map((p,i)=>{
-          const prev=i>0?prices[i-1].price:null;
-          const chg=prev?((p.price-prev)/prev)*100:null;
-          const dt=new Date(p.date+'T12:00:00').toLocaleDateString('es-CR',{month:'short',day:'numeric'});
-          return`<span class="strend-entry" style="border-color:${chg===null?'var(--sand)':chg>0?'#c07060':chg<0?'#5a9a6a':'var(--sand)'}">
-            ${dt} · ${fmtP(p.price,'CRC')}${chg!==null?` <span style="color:${chg>0?'#C05050':'#3a7a4a'}">${chg>0?'▲':'▼'}${Math.abs(chg).toFixed(0)}%</span>`:''}
-          </span>`;
-        }).join('')}
-      </div>
-    </div>`).join(''):`<p style="font-size:.82rem;color:var(--muted);padding:.5rem 0">Se necesitan 2+ compras del mismo artículo.</p>`;
-  // Rango min/max
-  const byV={};
-  d.filter(r=>r.price).forEach(r=>{
-    const k=itemKey(r);
-    if(!byV[k])byV[k]={label:itemLabelPlain(r),min:Infinity,max:-Infinity,curr:r.currency||'CRC'};
-    const p=parseFloat(r.price);
-    byV[k].min=Math.min(byV[k].min,p);byV[k].max=Math.max(byV[k].max,p);
-  });
-  const pItems=Object.values(byV).filter(v=>v.min!==v.max).slice(0,8);
-  mkChart('sc-prange','bar',
-    pItems.map(v=>v.label.length>14?v.label.slice(0,12)+'…':v.label),
-    [
-      {label:'Mínimo',data:pItems.map(v=>v.min),backgroundColor:'#4A8C6ACC',borderColor:'#4A8C6A',borderWidth:1.5,borderRadius:4},
-      {label:'Máximo',data:pItems.map(v=>v.max),backgroundColor:'#C05050CC',borderColor:'#C05050',borderWidth:1.5,borderRadius:4}
-    ]
-  );
-}
-
-// ══ TAB 4: OPERACIONES ══
-function renderSOperaciones(){
-  const d=_statsD;
-  // Gasto mensual
-  const byMonth={};
-  d.filter(r=>r.currency==='CRC'&&r.price&&r.bought_at).forEach(r=>{
-    const m=r.bought_at.slice(0,7); // YYYY-MM
-    byMonth[m]=(byMonth[m]||0)+(parseFloat(r.price)||0);
-  });
-  const months=Object.keys(byMonth).sort();
-  const monthLabels=months.map(m=>{
-    const [y,mo]=m.split('-');
-    return new Date(+y,+mo-1,1).toLocaleDateString('es-CR',{month:'short',year:'2-digit'});
-  });
-  const monthVals=months.map(m=>Math.round(byMonth[m]));
-  const monthColors=monthVals.map((v,i)=>i===0?SCOLS[0]:v>monthVals[i-1]?'#C05050CC':'#4A8C6ACC');
-  mkChart('sc-monthly','bar',monthLabels,
-    [{data:monthVals,backgroundColor:monthColors,borderColor:monthColors.map(c=>c.slice(0,7)),borderWidth:1.5,borderRadius:6}],
-    {plugins:{legend:{display:false},tooltip:{callbacks:{label:({raw})=>'₡'+raw.toLocaleString('es-CR')}}},
-     scales:{
-       x:{ticks:{font:{family:'Montserrat',size:9},color:'#8A9890'},grid:{display:false}},
-       y:{ticks:{font:{family:'Montserrat',size:9},color:'#8A9890',callback:v=>'₡'+v.toLocaleString('es-CR')},grid:{color:'rgba(0,0,0,.04)'}}
-     }}
-  );
-  // Tiendas
-  const spend={};const visits={};
-  d.filter(r=>r.store).forEach(r=>{
-    if(!spend[r.store])spend[r.store]={CRC:0,USD:0};
-    spend[r.store][r.currency||'CRC']+=(parseFloat(r.price)||0);
-    visits[r.store]=(visits[r.store]||0)+1;
-  });
-  const stores=Object.keys(spend).sort((a,b)=>(spend[b].CRC+spend[b].USD*600)-(spend[a].CRC+spend[a].USD*600));
-  mkChart('sc-stores','doughnut',stores,
-    [{data:stores.map(s=>Math.round(spend[s].CRC+(spend[s].USD*600))),
-      backgroundColor:SCOLS_ALPHA('DD'),borderColor:SCOLS,borderWidth:2}]
-  );
-  const maxV=Math.max(...Object.values(visits),1);
-  document.getElementById('st-visits').innerHTML=stores.map((s,i)=>`
-    <div class="sfreq">
-      <div class="sfreq-name">${s}</div>
-      <div class="sfreq-bar-bg"><div class="sfreq-bar" style="width:${(visits[s]/maxV)*100}%;background:${SCOLS[i%SCOLS.length]}"></div></div>
-      <div class="sfreq-cnt">${visits[s]}x · ${fmtP(spend[s].CRC,'CRC')}</div>
-    </div>`).join('');
-  // Usuarios
-  const ucnt={};const uspend={};const ucolor={};
-  d.forEach(r=>{
-    const who=r.bought_by||'?';
-    ucnt[who]=(ucnt[who]||0)+1;
-    if(!uspend[who])uspend[who]={CRC:0,USD:0};
-    uspend[who][r.currency||'CRC']+=(parseFloat(r.price)||0);
-  });
-  const users=Object.keys(ucnt).sort((a,b)=>ucnt[b]-ucnt[a]);
-  users.forEach((u,i)=>ucolor[u]=SCOLS[i%SCOLS.length]);
-  mkChart('sc-users','doughnut',users,
-    [{data:users.map(u=>ucnt[u]),
-      backgroundColor:users.map((_,i)=>SCOLS[i%SCOLS.length]+'DD'),
-      borderColor:users.map((_,i)=>SCOLS[i%SCOLS.length]),borderWidth:2}]
-  );
-  document.getElementById('su-spend').innerHTML=users.map(u=>`
-    <div class="suser-row">
-      <div class="suser-av" style="background:${ucolor[u]}">${u[0].toUpperCase()}</div>
-      <div style="flex:1"><div class="suser-name">${u}</div><div class="suser-cnt">${ucnt[u]} compras · ${fmtP(uspend[u].CRC,'CRC')}</div></div>
-    </div>`).join('');
-  // Día de la semana
-  const wdays=[0,0,0,0,0,0,0];
-  d.forEach(r=>{if(r.bought_at)wdays[new Date(r.bought_at).getDay()]++;});
-  mkChart('sc-weekday','bar',DIAS,
-    [{data:wdays,backgroundColor:wdays.map((_,i)=>SCOLS[i%SCOLS.length]+'CC'),
-      borderColor:wdays.map((_,i)=>SCOLS[i%SCOLS.length]),borderWidth:1.5,borderRadius:6}],
-    {plugins:{legend:{display:false}},scales:{
-      x:{ticks:{font:{family:'Geist',size:10},color:'#8A9890'},grid:{display:false}},
-      y:{ticks:{stepSize:1,font:{family:'Geist',size:9},color:'#8A9890'},grid:{color:'rgba(0,0,0,.04)'}}
-    }}
-  );
-}
-
-// ══════════════════════════════════════════════
-// ══ PAGOS Y SERVICIOS — ESTADÍSTICAS ══
-// ══════════════════════════════════════════════
-function renderSPagosResumen(){
-  const d=_statsPagosD;
-  const fmtCRC=n=>'₡'+Math.round(n).toLocaleString('es-CR');
-  const fmtUSD=n=>'$'+n.toLocaleString('es-CR',{minimumFractionDigits:2});
-  const fmtP=(n,c)=>c==='USD'?fmtUSD(n):fmtCRC(n);
-
-  // KPIs
-  const totalCRC=d.filter(r=>r.currency==='CRC').reduce((s,r)=>s+(parseFloat(r.price)||0),0);
-  const uServices=new Set(d.map(r=>r.item_name)).size;
-  const months=new Set(d.map(r=>r.bought_at?.slice(0,7))).size||1;
-  const avgMonth=totalCRC/months;
-  const pendFacs=_facturas.filter(f=>f.status==='pendiente');
-  const pendTotal=pendFacs.reduce((s,f)=>s+(f.total_crc||0),0);
-
-  document.getElementById('sp-kpis').innerHTML=`
-    <div class="skpi"><div class="skpi-val" style="font-size:.95rem">${fmtCRC(totalCRC)}</div><div class="skpi-lbl">Total pagado ₡</div></div>
-    <div class="skpi"><div class="skpi-val">${uServices}</div><div class="skpi-lbl">Servicios únicos</div></div>
-    <div class="skpi"><div class="skpi-val" style="font-size:.95rem">${fmtCRC(Math.round(avgMonth))}</div><div class="skpi-lbl">Promedio mensual</div></div>
-    <div class="skpi"><div class="skpi-val">${d.length}</div><div class="skpi-lbl">Pagos registrados</div></div>
-    <div class="skpi ${pendFacs.length?'skpi-alert':''}"><div class="skpi-val" style="font-size:${pendTotal>0?'.9rem':'1.5rem'};color:${pendFacs.length?'#C07030':'var(--tc)'}">${pendFacs.length?fmtCRC(Math.round(pendTotal)):pendFacs.length}</div><div class="skpi-lbl">Pendientes${pendFacs.length?` (${pendFacs.length})`:''}</div></div>
-    <div class="skpi"><div class="skpi-val">${months}</div><div class="skpi-lbl">Meses con pagos</div></div>
-  `;
-
-  // Gasto mensual
-  const byMonth={};
-  d.filter(r=>r.currency==='CRC'&&r.price&&r.bought_at).forEach(r=>{
-    const m=r.bought_at.slice(0,7);
-    byMonth[m]=(byMonth[m]||0)+(parseFloat(r.price)||0);
-  });
-  const mos=Object.keys(byMonth).sort();
-  const mosLabels=mos.map(m=>{const[y,mo]=m.split('-');return new Date(+y,+mo-1,1).toLocaleDateString('es-CR',{month:'short',year:'2-digit'});});
-  const mosVals=mos.map(m=>Math.round(byMonth[m]));
-  const mosColors=mosVals.map((v,i)=>i===0?SCOLS[2]+'CC':v>mosVals[i-1]?'#C05050CC':'#4A8C6ACC');
-  mkChart('spc-monthly','bar',mosLabels,
-    [{data:mosVals,backgroundColor:mosColors,borderColor:mosColors.map(c=>c.slice(0,7)),borderWidth:1.5,borderRadius:6}],
-    {plugins:{legend:{display:false},tooltip:{callbacks:{label:({raw})=>'₡'+raw.toLocaleString('es-CR')}}},
-     scales:{
-       x:{ticks:{font:{family:'Montserrat',size:9},color:'#8A9890'},grid:{display:false}},
-       y:{ticks:{font:{family:'Montserrat',size:9},color:'#8A9890',callback:v=>'₡'+v.toLocaleString('es-CR')},grid:{color:'rgba(0,0,0,.04)'}}
-     }}
-  );
-
-  // Top servicios más costosos
-  const svcTotals={};const svcLabel={};
-  d.filter(r=>r.currency==='CRC'&&r.price).forEach(r=>{
-    svcTotals[r.item_name]=(svcTotals[r.item_name]||0)+(parseFloat(r.price)||0);
-    svcLabel[r.item_name]=r.item_name;
-  });
-  const topSvc=Object.entries(svcTotals).sort((a,b)=>b[1]-a[1]).slice(0,6);
-  const maxSvc=topSvc[0]?topSvc[0][1]:1;
-  document.getElementById('sp-top-services').innerHTML=topSvc.length?topSvc.map(([name,total],i)=>`
-    <div class="sspend-row">
-      <span class="sspend-rank">${i+1}</span>
-      <span class="sspend-name">${name}</span>
-      <div class="sspend-bar-wrap"><div class="sspend-bar" style="width:${Math.round(total/maxSvc*100)}%;background:${SCOLS[(i+2)%SCOLS.length]}"></div></div>
-      <span class="sspend-amt">${fmtCRC(total)}</span>
-    </div>`).join(''):`<p style="font-size:.82rem;color:var(--muted)">Sin datos aún.</p>`;
-}
-
-function renderSPagosServicios(){
-  const d=_statsPagosD;
-  const fmtCRC=n=>'₡'+Math.round(n).toLocaleString('es-CR');
-
-  // Gasto acumulado por servicio
-  const totals={};const labels={};
-  d.filter(r=>r.currency==='CRC'&&r.price).forEach(r=>{
-    totals[r.item_name]=(totals[r.item_name]||0)+(parseFloat(r.price)||0);
-    labels[r.item_name]=r.item_name;
-  });
-  const ranked=Object.entries(totals).sort((a,b)=>b[1]-a[1]);
-  const maxT=ranked[0]?ranked[0][1]:1;
-  document.getElementById('sp-spend-rank').innerHTML=ranked.length?ranked.map(([name,total],i)=>`
-    <div class="sspend-row">
-      <span class="sspend-rank">${i+1}</span>
-      <span class="sspend-name">${name}</span>
-      <div class="sspend-bar-wrap"><div class="sspend-bar" style="width:${Math.round(total/maxT*100)}%;background:${SCOLS[i%SCOLS.length]}"></div></div>
-      <span class="sspend-amt">${fmtCRC(total)}</span>
-    </div>`).join(''):`<p style="font-size:.82rem;color:var(--muted)">Sin datos aún.</p>`;
-
-  // Frecuencia de pago
-  const dates={};
-  d.forEach(r=>{if(!dates[r.item_name])dates[r.item_name]=[];dates[r.item_name].push(new Date(r.bought_at).getTime());});
-  const freq=Object.entries(dates).map(([name,ts])=>{
-    ts.sort((a,b)=>a-b);
-    let avg=null;
-    if(ts.length>1){const diffs=ts.slice(1).map((t,i)=>(t-ts[i])/86400000);avg=Math.round(diffs.reduce((s,v)=>s+v,0)/diffs.length);}
-    return{name,count:ts.length,avg};
-  }).sort((a,b)=>b.count-a.count);
-  const mx=Math.max(...freq.map(f=>f.count),1);
-  document.getElementById('sp-freq').innerHTML=freq.map(f=>`
-    <div class="sfreq">
-      <div class="sfreq-name" title="${f.name}">${f.name}</div>
-      <div class="sfreq-bar-bg"><div class="sfreq-bar" style="width:${(f.count/mx)*100}%"></div></div>
-      <div class="sfreq-cnt">${f.count}x${f.avg?` · c/${f.avg}d`:''}</div>
-    </div>`).join('');
-}
-
-function renderSPagosEvolucion(){
-  const d=_statsPagosD;
-  const fmtCRC=n=>'₡'+Math.round(n).toLocaleString('es-CR');
-
-  // Tendencia por servicio
-  const byVDay={};
-  d.filter(r=>r.currency==='CRC'&&r.price).forEach(r=>{
-    const day=r.bought_at?.slice(0,10)||'';
-    if(!byVDay[r.item_name])byVDay[r.item_name]={};
-    byVDay[r.item_name][day]=parseFloat(r.price)||0;
-  });
-  const trending=Object.entries(byVDay).filter(([,ds])=>Object.keys(ds).length>1)
-    .map(([name,ds])=>{
-      const sorted=Object.keys(ds).sort();
-      const prices=sorted.map(d=>({date:d,price:ds[d]}));
-      const diff=((prices[prices.length-1].price-prices[0].price)/prices[0].price)*100;
-      return{name,prices,diff};
-    }).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff));
-
-  document.getElementById('sp-trend').innerHTML=trending.length?trending.map(({name,prices,diff})=>`
-    <div class="strend-row">
-      <div class="strend-name">${name}
-        <span style="font-size:.65rem;padding:.1rem .4rem;border-radius:10px;margin-left:.3rem;
-          background:${diff>5?'#fff0ee':diff<-5?'#f0f8f2':'var(--warm)'};
-          color:${diff>5?'#C05050':diff<-5?'#3a7a4a':'var(--muted)'}">
-          ${diff>0?'▲':'▼'} ${Math.abs(diff).toFixed(0)}%
-        </span>
-      </div>
-      <div class="strend-prices">
-        ${prices.map((p,i)=>{
-          const prev=i>0?prices[i-1].price:null;
-          const chg=prev?((p.price-prev)/prev)*100:null;
-          const dt=new Date(p.date+'T12:00:00').toLocaleDateString('es-CR',{month:'short',day:'numeric'});
-          return`<span class="strend-entry" style="border-color:${chg===null?'var(--sand)':chg>0?'#c07060':chg<0?'#5a9a6a':'var(--sand)'}">
-            ${dt} · ${fmtCRC(p.price)}${chg!==null?` <span style="color:${chg>0?'#C05050':'#3a7a4a'}">${chg>0?'▲':'▼'}${Math.abs(chg).toFixed(0)}%</span>`:''}
-          </span>`;
-        }).join('')}
-      </div>
-    </div>`).join(''):`<p style="font-size:.82rem;color:var(--muted);padding:.5rem 0">Se necesitan 2+ pagos del mismo servicio para comparar.</p>`;
-
-  // Rango min/max
-  const byV={};
-  d.filter(r=>r.price&&r.currency==='CRC').forEach(r=>{
-    if(!byV[r.item_name])byV[r.item_name]={label:r.item_name,min:Infinity,max:-Infinity};
-    const p=parseFloat(r.price);
-    byV[r.item_name].min=Math.min(byV[r.item_name].min,p);
-    byV[r.item_name].max=Math.max(byV[r.item_name].max,p);
-  });
-  const pItems=Object.values(byV).filter(v=>v.min!==v.max).slice(0,8);
-  mkChart('spc-prange','bar',
-    pItems.map(v=>v.label.length>14?v.label.slice(0,12)+'…':v.label),
-    [
-      {label:'Mínimo',data:pItems.map(v=>v.min),backgroundColor:'#4A8C6ACC',borderColor:'#4A8C6A',borderWidth:1.5,borderRadius:4},
-      {label:'Máximo',data:pItems.map(v=>v.max),backgroundColor:'#C05050CC',borderColor:'#C05050',borderWidth:1.5,borderRadius:4}
-    ],
-    {scales:{
-      x:{ticks:{font:{family:'Montserrat',size:9},color:'#8A9890'},grid:{display:false}},
-      y:{ticks:{font:{family:'Montserrat',size:9},color:'#8A9890',callback:v=>'₡'+v.toLocaleString('es-CR')},grid:{color:'rgba(0,0,0,.04)'}}
-    }}
-  );
-}
-</script>
 
 </body>
 </html>
