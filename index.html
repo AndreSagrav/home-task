@@ -10020,7 +10020,7 @@ async function adminLoadStats(){
 function _renderStatsDiagnostic(rows, scopeHouse){
   const total = rows.length;
   document.getElementById('diag-total').textContent = total.toLocaleString('es-CR');
-  document.getElementById('diag-total-sub').textContent = scopeHouse ? 'de tu casa (list_type=shopping)' : 'globales (list_type=shopping)';
+  document.getElementById('diag-total-sub').textContent = scopeHouse ? 'de tu casa (compras excluyendo Pagos)' : 'de todas las casas';
 
   // Rango de fechas
   let minDate=null, maxDate=null;
