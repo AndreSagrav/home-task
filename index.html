@@ -9933,8 +9933,11 @@ async function _loadMergedPurchases(scopeHouse){
     });
   }catch(e){ console.warn('_loadMergedPurchases facturas:',e.message); }
 
-  // 3) Dedup: si ya está en purchase_history (mismo item+timestamp+precio+moneda), omitir versión de factura
-  const phKey = r => `${r.item_name}|${r.bought_at}|${r.price}|${r.currency}`;
+  // 3) Dedup robusto: redondear timestamp a minuto (evita duplicados por ms de diferencia)
+  const phKey = r => {
+    const ts = r.bought_at ? new Date(r.bought_at).toISOString().slice(0,16) : '—'; // YYYY-MM-DDTHH:mm
+    return `${r.item_name}|${ts}|${r.price}|${r.currency}|${r.store||''}`;
+  };
   const phKeys = new Set(phRows.map(phKey));
   const factDedup = factRows.filter(r => !phKeys.has(phKey(r)));
 
