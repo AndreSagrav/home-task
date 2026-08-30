@@ -6673,8 +6673,10 @@ function mbcToggleSkip(){
   chk.textContent=_mbc.skip?'✓':'';
   document.getElementById('mbc-buy-fields').style.display=_mbc.skip?'none':'';
   document.getElementById('mbc-err').style.display='none';
-  // Cambiar texto del botón según si se marca "Al inventario"
-  document.getElementById('mbc-confirm').textContent=_mbc.skip?'✓ Al inventario':'🛒 Al carrito';
+  const list=UD.lists.find(l=>l.id===_mbc.lid);
+  const isPagos=list?._tpl==='tpl-pagos' || list?.name==='Pagos y Servicios';
+  // Si está marcado "A la alacena", el botón de acción dice simplemente "Aceptar"
+  document.getElementById('mbc-confirm').textContent=_mbc.skip?'Aceptar':(isPagos?'✓ Confirmar':'🛒 Al carrito');
 }
 function mbcSelStore(id,name){
   _mbc.selStore={id,name};
@@ -6930,7 +6932,7 @@ function delCat(e,lid,cid){
   });
 }
 function resetShop(lid){
-  openConfirmModal('¿Iniciar nueva compra?','Todos los artículos vuelven al inventario como "en casa".',()=>{
+  openConfirmModal('¿Iniciar nueva compra?','Todos los artículos vuelven a la alacena como "en casa".',()=>{
     const list=UD.lists.find(l=>l.id===lid);
     const s=list.shopping;
     (s.inventoryItems||[]).forEach(item=>{
