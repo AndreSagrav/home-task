@@ -5340,6 +5340,43 @@ function updateTabBadge(lid){
   const badge=n>0?`<span class="tc">${n}</span>`:'';
   btn.innerHTML=`${list.icon||'📋'} ${esc(list.name)} ${badge}`;
 }
+function getPendingItems(list){
+  if(!list||!list.shopping||!Array.isArray(list.shopping.inventoryItems)) return [];
+  const isPagos=list._tpl==='tpl-pagos' || list.name==='Pagos y Servicios';
+  const s=list.shopping;
+  const chk=s.checked||{};
+  
+  if(isPagos){
+    return s.inventoryItems.filter(i=>{
+      const isPending=!!s.inventoryPending?.[i.id]||chk[i.id]?.bought===false;
+      const isEnCasa=chk[i.id]?.bought===true && !s.inventoryPending?.[i.id];
+      return isPending && !isEnCasa;
+    });
+  }
+  
+  const cartNow=getCart(list.id)||[];
+  const cartItemIds=new Set(cartNow.filter(e=>!e.isSub).map(e=>e.itemId));
+  const cartSubIds=new Set(cartNow.filter(e=>e.isSub).map(e=>e.subId));
+  
+  return s.inventoryItems.filter(i=>{
+    const isPending=!!s.inventoryPending?.[i.id]||chk[i.id]?.bought===false;
+    if(!isPending) return false;
+    const itemStatus=chk[i.id];
+    const inCartPersisted=!!s.inventoryPending?.[i.id]?.inCart;
+    const inCartReal=cartItemIds.has(i.id);
+    const inCartFlag=!!itemStatus?.inCart;
+    const isBoughtNotCart=!!(itemStatus?.bought&&!itemStatus?.inCart&&!s.inventoryPending?.[i.id]);
+    if(inCartPersisted||inCartReal||inCartFlag||isBoughtNotCart) return false;
+    const subs=s.subItems?.[i.id]||[];
+    if(subs.length>0){
+      const subBought=s.subBought||{};
+      const allInCart=subs.every(sc=>subBought[sc.id]?.inCart||cartSubIds.has(sc.id));
+      if(allInCart) return false;
+    }
+    return true;
+  });
+}
+
 function countPending(list){
   try{
     if(!list)return 0;
@@ -5349,7 +5386,6 @@ function countPending(list){
       const scPending=(list.cats||[]).reduce((sum,cat)=>
         sum+(cat.subcats||[]).filter(sc=>{
           if(sc._hidden||sc.paid) return false;
-          // Solo pendiente si tiene monto ingresado o pagos individuales con monto
           const hasMonto=(parseFloat(sc.amount)||0)>0;
           const hasPayMonto=(sc.payments||[]).some(p=>!p.paid&&(parseFloat(p.amount)||0)>0);
           return hasMonto||hasPayMonto;
@@ -5358,33 +5394,10 @@ function countPending(list){
       return taskPending+scPending;
     }
     const s=list.shopping||{};
-    const chk=s.checked||{};
-    if(!isPagos&&Array.isArray(s.inventoryItems)){
-      const cartNow=getCart(list.id)||[];
-      const cartItemIds=new Set(cartNow.filter(e=>!e.isSub).map(e=>e.itemId));
-      const cartSubIds=new Set(cartNow.filter(e=>e.isSub).map(e=>e.subId));
-      const pendingItems=s.inventoryItems.filter(i=>{
-        const isPending=!!s.inventoryPending?.[i.id]||chk[i.id]?.bought===false;
-        if(!isPending) return false;
-        const itemStatus=chk[i.id];
-        const inCartPersisted=!!s.inventoryPending?.[i.id]?.inCart;
-        const inCartReal=cartItemIds.has(i.id);
-        const inCartFlag=!!itemStatus?.inCart;
-        const isBoughtNotCart=!!(itemStatus?.bought&&!itemStatus?.inCart&&!s.inventoryPending?.[i.id]);
-        if(inCartPersisted) return false;
-        if(inCartReal) return false;
-        if(inCartFlag) return false;
-        if(isBoughtNotCart) return false;
-        const subs=s.subItems?.[i.id]||[];
-        if(subs.length>0){
-          const subBought=s.subBought||{};
-          const allInCart=subs.every(sc=>subBought[sc.id]?.inCart||cartSubIds.has(sc.id));
-          if(allInCart) return false;
-        }
-        return true;
-      });
-      return pendingItems.length;
+    if(Array.isArray(s.inventoryItems)){
+      return getPendingItems(list).length;
     }
+    const chk=s.checked||{};
     const cc=Array.isArray(s.customCats)?s.customCats:[];
     const extraRaw=s.extraItems||{};
     const extraItemsFlat=Array.isArray(extraRaw)?extraRaw:Object.values(extraRaw).flat();
@@ -5518,42 +5531,29 @@ function buildShop(list){
     }
   }));
 
+  // Sanitizar consistencia de estados para Pagos y Servicios
+  if(isPagos){
+    s.inventoryItems.forEach(item=>{
+      if(s.checked[item.id]?.bought===true && s.inventoryPending?.[item.id]){
+        delete s.inventoryPending[item.id];
+      }
+      if(s.checked[item.id]===undefined && !s.inventoryPending?.[item.id]){
+        s.checked[item.id]={bought:true,fromInventory:true,who:'sistema',ts:Date.now()};
+      }
+    });
+  }
+
   const chk=s.checked;
   const flt=shopFilter[list.id]||'all';
   const customStores=Array.isArray(s.customStores)?s.customStores:[];
 
   loadCart(list.id);
 
-  const cartNow=getCart(list.id)||[];
-  const cartItemIds=new Set(cartNow.filter(e=>!e.isSub).map(e=>e.itemId));
-  const cartSubIds=new Set(cartNow.filter(e=>e.isSub).map(e=>e.subId));
-
-  // ── Artículos pendientes = inventario con check desactivado y NO en carrito ──
-  const pendingItems=s.inventoryItems.filter(i=>{
-    const isPending=!!s.inventoryPending?.[i.id]||chk[i.id]?.bought===false;
-    if(!isPending) return false;
-    const itemStatus=chk[i.id];
-    const inCartPersisted=!!s.inventoryPending?.[i.id]?.inCart;
-    const inCartReal=cartItemIds.has(i.id);
-    const inCartFlag=!!itemStatus?.inCart;
-    const isBoughtNotCart=!!(itemStatus?.bought && !itemStatus?.inCart && !s.inventoryPending?.[i.id]);
-    if(inCartPersisted) return false;
-    if(inCartReal) return false;
-    if(inCartFlag) return false;
-    if(isBoughtNotCart) return false;
-    // Verificar si todos los sub-items están en carrito
-    const subs=s.subItems?.[i.id]||[];
-    if(subs.length>0){
-      const subBought=s.subBought||{};
-      const allInCart=subs.every(s=>subBought[s.id]?.inCart||cartSubIds.has(s.id));
-      if(allInCart) return false;
-    }
-    return true;
-  });
+  // ── Artículos pendientes = sincronizados con getPendingItems ──
+  const pendingItems=getPendingItems(list);
 
   // ── Contar pendientes por tienda ──
   const sc={verd:0,carn:0,superm:0,minis:0,feria:0,panaderia:0,farmacia:0,hogar:0};
-  // Contar SIEMPRE sobre todos los pendientes (independiente del filtro activo)
   pendingItems.forEach(item=>{
     (item.stores||['pali']).forEach(store=>{
       if(sc[store]!==undefined) sc[store]++;
@@ -5561,10 +5561,10 @@ function buildShop(list){
   });
   const pendAll=flt==='all'?pendingItems.length:pendingItems.filter(i=>i.stores?.includes(flt)).length;
 
-  // ── Barra de progreso: % de artículos en casa ──
+  // ── Barra de progreso: % de artículos/servicios al día ──
   const invTotal=s.inventoryItems.length;
-  const invEnCasa=s.inventoryItems.filter(i=>chk[i.id]?.bought).length;
-  const pctFinal=invTotal?Math.round(invEnCasa/invTotal*100):0;
+  const invEnCasa=s.inventoryItems.filter(i=>!pendingItems.some(p=>p.id===i.id)).length;
+  const pctFinal=invTotal?Math.round(invEnCasa/invTotal*100):100;
 
   let html=`
   <div class="panel-hdr">
@@ -5732,12 +5732,10 @@ function buildShop(list){
   // SECCIÓN: INVENTARIO
   // ══════════════════════════════════════════
   const invCollapsed=catCol[list.id+'__inv']!==false;
-  // Filtrar: ocultar ítems que están en pendientes (inventoryPending) y no comprados
-  const _invPending=s.inventoryPending||{};
+  // Mostrar en Alacena/Servicios los que NO están en pendientes
   const invVisibleItems=[...s.inventoryItems].filter(item=>{
-    const enCasa=chk[item.id]?.bought===true;
-    const enPendiente=!!_invPending[item.id]&&!enCasa;
-    return !enPendiente; // mostrar solo los que NO están en pendientes
+    const isPending=pendingItems.some(p=>p.id===item.id);
+    return !isPending;
   }).sort((a,b)=>a.name.localeCompare(b.name,'es'));
   const invHTML=invVisibleItems.map(item=>{
     const enCasa=chk[item.id]?.bought===true;

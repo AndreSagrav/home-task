@@ -1,4 +1,4 @@
-const CACHE='mh-v20-alacena';
+const CACHE='mh-v21-sync';
 const ASSETS=['./'];
 
 self.addEventListener('install',e=>{
