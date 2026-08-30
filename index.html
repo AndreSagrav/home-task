@@ -1314,8 +1314,6 @@ body.dark .note-row textarea{background:var(--bg-input);color:var(--text);border
     border-radius:20px;
     white-space:nowrap;
   }
-  .ka-txt{display:none;}
-  #hdr-keepalive-btn{padding:.26rem .45rem !important;}
   .av-sm{width:28px;height:28px;font-size:.75rem;}
 
   /* Filtros de tiendas — scroll horizontal, sin wrap */
@@ -1963,9 +1961,6 @@ body{line-height:1.6;}
         </div>
       </div>
       <div id="presence-bar" style="display:flex;align-items:center;gap:-4px;margin-right:.3rem"></div>
-      <button id="hdr-keepalive-btn" class="hdr-btn" onclick="toggleKeepAlive()" title="Keep-Alive (pantalla y conexión siempre activas)" style="display:none;background:rgba(212,150,60,.15);border:1.5px solid rgba(212,150,60,.4);color:var(--gold);padding:.32rem .6rem;border-radius:20px;font-size:.74rem;font-weight:600;align-items:center;gap:.3rem">
-        <span style="font-size:.85rem">⚡</span> <span class="ka-txt">Activa</span>
-      </button>
       <button class="hdr-btn gold" onclick="openLog()">📋 Actividad</button>
       <button class="hdr-btn tc" onclick="openPurchaseHistory()">📊 Historial</button>
       <button class="hdr-btn tc" onclick="openFacturasModal()">🧾 Pendientes</button>
@@ -4472,7 +4467,6 @@ async function syncHousesFromSupabase(){
 function goToHouses(){
   _adminGhostCode=null;
   CH=null;UD=null;_logCache=[];stopRealtimeSync();stopPresence();
-  if(typeof updateKeepAliveUI==='function') updateKeepAliveUI();
   renderHousesScreen();showScreen('s-houses');
 }
 
@@ -4610,8 +4604,6 @@ async function enterHouse(house){
   startRealtimeSync();
   startPresence();
   initPushNotifications();
-  if(typeof requestWakeLock==='function') requestWakeLock();
-  if(typeof updateKeepAliveUI==='function') updateKeepAliveUI();
   // Procesar cambios pendientes offline al entrar a la casa
   setTimeout(()=>processOfflineQueue(),2000);
   // Abrir factura si viene desde enlace de correo
@@ -10073,10 +10065,6 @@ function _renderStatsDiagnostic(rows, scopeHouse){
     const c = r.currency||'CRC';
     const p = parseFloat(r.price)||0;
     totals[c] = (totals[c]||0) + p;
-    // Debug: log items con precios anormalmente altos
-    if(p > 50000 && c==='CRC' || p > 50 && c==='USD'){
-      console.warn('Item con precio alto:', {item:r.item_name, price:p, currency:c, bought_at:r.bought_at, store:r.store, source:r.__factura?'factura':'purchase_history'});
-    }
   });
   const totalsEl = document.getElementById('diag-totals');
   if(Object.keys(totals).length===0){
@@ -10733,232 +10721,10 @@ function renderThemeSelector(){
   wrap.innerHTML=''; // Un solo tema — no mostrar selector
 }
 
-// ══════════════════════ SISTEMA KEEP-ALIVE & ANTI-PAUSA ROBUSTO ══════════════════════
-const K_KEEP_ALIVE = 'mh_keep_alive';
-let _wakeLock = null;
-let _keepAliveEnabled = localStorage.getItem(K_KEEP_ALIVE) !== 'false'; // Por defecto ON
-let _audioKeepAliveCtx = null;
-let _workerKeepAlive = null;
-let _lastHeartbeat = Date.now();
-
-function showToast(msg, duration = 3000) {
-  let toast = document.getElementById('mh-toast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'mh-toast';
-    toast.style.cssText = 'position:fixed;top:1.2rem;left:50%;transform:translateX(-50%);background:var(--esp);color:var(--cream);padding:.6rem 1.2rem;border-radius:24px;font-size:.82rem;font-weight:600;z-index:10000;box-shadow:0 6px 24px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.15);transition:opacity .3s,transform .3s;opacity:0;pointer-events:none;max-width:90vw;text-align:center;';
-    document.body.appendChild(toast);
-  }
-  toast.textContent = msg;
-  toast.style.opacity = '1';
-  toast.style.transform = 'translateX(-50%) translateY(0)';
-  clearTimeout(toast._timer);
-  toast._timer = setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateX(-50%) translateY(-10px)';
-  }, duration);
-}
-
-// 1. Screen Wake Lock (API nativa de pantalla activa)
-async function requestWakeLock() {
-  if (!_keepAliveEnabled) return;
-  if ('wakeLock' in navigator) {
-    try {
-      if (_wakeLock && !_wakeLock.released) {
-        updateKeepAliveUI();
-        return;
-      }
-      _wakeLock = await navigator.wakeLock.request('screen');
-      _wakeLock.addEventListener('release', () => {
-        _wakeLock = null;
-        updateKeepAliveUI();
-        if (_keepAliveEnabled && !document.hidden) {
-          setTimeout(requestWakeLock, 1000);
-        }
-      });
-      console.log('⚡ Keep-Alive: Screen WakeLock adquirido');
-    } catch (err) {
-      console.warn('⚡ Keep-Alive: WakeLock no disponible:', err.message);
-    }
-  }
-  updateKeepAliveUI();
-}
-
-function releaseWakeLock() {
-  if (_wakeLock) {
-    try { _wakeLock.release(); } catch (_) {}
-    _wakeLock = null;
-  }
-  updateKeepAliveUI();
-}
-
-// 2. Audio Keep-Alive / NoSleep (evita que el SO pause la ejecución de JS en móviles)
-function initAudioKeepAlive() {
-  if (_audioKeepAliveCtx || !_keepAliveEnabled) return;
-  try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    _audioKeepAliveCtx = new AudioContext();
-    const buffer = _audioKeepAliveCtx.createBuffer(1, _audioKeepAliveCtx.sampleRate * 2, _audioKeepAliveCtx.sampleRate);
-    const source = _audioKeepAliveCtx.createBufferSource();
-    source.buffer = buffer;
-    source.loop = true;
-    const gainNode = _audioKeepAliveCtx.createGain();
-    gainNode.gain.setValueAtTime(0.00001, _audioKeepAliveCtx.currentTime); // inaudible
-    source.connect(gainNode);
-    gainNode.connect(_audioKeepAliveCtx.destination);
-    source.start(0);
-    if (_audioKeepAliveCtx.state === 'suspended') {
-      _audioKeepAliveCtx.resume().catch(() => {});
-    }
-    console.log('⚡ Keep-Alive: Audio heartbeat activo');
-  } catch (e) {
-    console.warn('⚡ Keep-Alive: Audio heartbeat error:', e.message);
-  }
-}
-
-// 3. Web Worker Watchdog (inmune al throttling de timers del navegador)
-function initWorkerKeepAlive() {
-  if (_workerKeepAlive) return;
-  try {
-    const workerCode = `
-      setInterval(function() {
-        self.postMessage('TICK');
-      }, 10000);
-    `;
-    const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
-    const workerUrl = URL.createObjectURL(workerBlob);
-    _workerKeepAlive = new Worker(workerUrl);
-    _workerKeepAlive.onmessage = function() {
-      onKeepAliveTick();
-    };
-    console.log('⚡ Keep-Alive: Web Worker Watchdog iniciado');
-  } catch (e) {
-    console.warn('⚡ Keep-Alive: Fallback a setInterval:', e.message);
-    setInterval(onKeepAliveTick, 10000);
-  }
-}
-
-// Ejecutado en cada tick del Watchdog (cada 10s garantizado)
-async function onKeepAliveTick() {
-  _lastHeartbeat = Date.now();
-  if (!_keepAliveEnabled) return;
-
-  if (!document.hidden && (!_wakeLock || _wakeLock.released)) {
-    requestWakeLock();
-  }
-
-  if (_audioKeepAliveCtx && _audioKeepAliveCtx.state === 'suspended') {
-    _audioKeepAliveCtx.resume().catch(() => {});
-  }
-
-  if (CH && CU && navigator.onLine) {
-    if (!_realtimeOk) {
-      console.log('⚡ Keep-Alive Watchdog: Realtime caído, reactivando...');
-      startRealtimeSync();
-    } else if (_presenceChannel) {
-      try {
-        _presenceChannel.track({
-          id: CU.id, name: CU.name, color: CU.color || '#C07050', ts: Date.now()
-        }).catch(() => {});
-      } catch (_) {}
-    }
-    
-    if (typeof pollLists === 'function') {
-      pollLists();
-    }
-  }
-}
-
-function toggleKeepAlive() {
-  _keepAliveEnabled = !_keepAliveEnabled;
-  localStorage.setItem(K_KEEP_ALIVE, _keepAliveEnabled ? 'true' : 'false');
-  if (_keepAliveEnabled) {
-    requestWakeLock();
-    initAudioKeepAlive();
-    showToast('⚡ Keep-Alive ACTIVADO: Pantalla y conexión en vivo siempre activas');
-  } else {
-    releaseWakeLock();
-    if (_audioKeepAliveCtx && _audioKeepAliveCtx.state === 'running') {
-      _audioKeepAliveCtx.suspend().catch(() => {});
-    }
-    showToast('💤 Keep-Alive DESACTIVADO');
-  }
-  updateKeepAliveUI();
-}
-
-function updateKeepAliveUI() {
-  const btn = document.getElementById('keepalive-btn');
-  const label = document.getElementById('keepalive-label');
-  const icon = document.getElementById('keepalive-icon');
-  const hdrBtn = document.getElementById('hdr-keepalive-btn');
-  
-  const isWlActive = !!(_wakeLock && !_wakeLock.released);
-  
-  if (label) {
-    label.textContent = _keepAliveEnabled ? 'Keep-Alive: Activo' : 'Keep-Alive: Desactivado';
-  }
-  if (icon) {
-    icon.textContent = _keepAliveEnabled ? '⚡' : '💤';
-  }
-  if (btn) {
-    btn.style.borderColor = _keepAliveEnabled ? 'var(--gold)' : 'var(--sand)';
-    btn.style.background = _keepAliveEnabled ? 'rgba(212,150,60,.14)' : 'var(--warm)';
-    btn.style.color = _keepAliveEnabled ? 'var(--gold)' : 'var(--text)';
-  }
-  if (hdrBtn) {
-    hdrBtn.style.display = (CH ? 'inline-flex' : 'none');
-    if (_keepAliveEnabled) {
-      hdrBtn.style.background = isWlActive ? 'rgba(74,112,80,.18)' : 'rgba(212,150,60,.15)';
-      hdrBtn.style.borderColor = isWlActive ? 'var(--sage)' : 'var(--gold)';
-      hdrBtn.style.color = isWlActive ? 'var(--sage)' : 'var(--gold)';
-      hdrBtn.title = isWlActive ? '⚡ Keep-Alive ACTIVO (Pantalla y sincronización fijas)' : '⚡ Keep-Alive activo';
-    } else {
-      hdrBtn.style.background = 'rgba(100,100,100,.1)';
-      hdrBtn.style.borderColor = 'rgba(150,150,150,.3)';
-      hdrBtn.style.color = 'var(--muted)';
-      hdrBtn.title = '💤 Keep-Alive desactivado (toca para activar)';
-    }
-  }
-}
-
-function initKeepAlive() {
-  initWorkerKeepAlive();
-  if (_keepAliveEnabled) {
-    requestWakeLock();
-  }
-  
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && _keepAliveEnabled) {
-      requestWakeLock();
-      if (_audioKeepAliveCtx && _audioKeepAliveCtx.state === 'suspended') {
-        _audioKeepAliveCtx.resume().catch(() => {});
-      }
-      if (CH && typeof pollLists === 'function') pollLists();
-    }
-  });
-  
-  window.addEventListener('focus', () => {
-    if (_keepAliveEnabled) requestWakeLock();
-  });
-  
-  const onFirstInteraction = () => {
-    if (_keepAliveEnabled) {
-      requestWakeLock();
-      initAudioKeepAlive();
-    }
-    window.removeEventListener('click', onFirstInteraction);
-    window.removeEventListener('touchstart', onFirstInteraction);
-  };
-  window.addEventListener('click', onFirstInteraction, { passive: true });
-  window.addEventListener('touchstart', onFirstInteraction, { passive: true });
-  
-  updateKeepAliveUI();
-}
+function initDarkMode(){ initTheme(); }
 
 // ══════════════════════ INIT ══════════════════════
 renderHome();
-initKeepAlive();
 </script>
 <!-- MODAL: Mi perfil / cambiar contraseña -->
 <!-- MODAL: Restablecer contraseña (después de verificación 2FA) -->
@@ -11019,11 +10785,6 @@ initKeepAlive();
       <button id="darkmode-btn" class="btn" onclick="toggleDarkMode()" style="background:var(--warm);color:var(--text);border:1.5px solid var(--sand);font-size:.85rem;padding:.5rem;display:flex;align-items:center;justify-content:center;gap:.5rem">
         <span id="darkmode-icon">🌙</span> <span id="darkmode-label">Modo oscuro</span>
       </button>
-      <!-- Keep-Alive Anti-Pausa toggle -->
-      <button id="keepalive-btn" class="btn" onclick="toggleKeepAlive()" style="background:rgba(212,150,60,.14);color:var(--gold);border:1.5px solid var(--gold);font-size:.85rem;padding:.5rem;display:flex;align-items:center;justify-content:center;gap:.5rem">
-        <span id="keepalive-icon">⚡</span> <span id="keepalive-label">Keep-Alive: Activo</span>
-      </button>
-      <p style="font-size:.72rem;color:var(--muted);margin:-.2rem 0 .2rem;text-align:center;line-height:1.3">Evita que la pantalla se apague y mantiene la sincronización en vivo activa permanentemente (ideal para tablet/móvil).</p>
       <button id="push-test-btn" class="btn" onclick="testPushNotification()" style="background:var(--warm);color:var(--text);border:1.5px solid var(--sand);font-size:.85rem;padding:.5rem;display:flex;align-items:center;justify-content:center;gap:.5rem">
         🧪 Probar notificación
       </button>

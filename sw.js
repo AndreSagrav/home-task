@@ -1,4 +1,4 @@
-const CACHE='mh-v19-keepalive';
+const CACHE='mh-v16-dedup';
 const ASSETS=['./'];
 
 self.addEventListener('install',e=>{
