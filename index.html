@@ -5531,17 +5531,52 @@ function buildShop(list){
     }
   }));
 
-  // Sanitizar consistencia de estados para Pagos y Servicios
-  if(isPagos){
-    s.inventoryItems.forEach(item=>{
-      if(s.checked[item.id]?.bought===true && s.inventoryPending?.[item.id]){
-        delete s.inventoryPending[item.id];
-      }
-      if(s.checked[item.id]===undefined && !s.inventoryPending?.[item.id]){
+  // Sanitizar, deduplicar y normalizar consistencia de estados
+  const seenNames=new Set();
+  const seenIds=new Set();
+  const cleanInv=[];
+  let hadDuplicates=false;
+  (s.inventoryItems||[]).forEach(item=>{
+    if(!item||!item.id||!item.name)return;
+    if(deletedIds.has(item.id))return;
+    const nameKey=item.name.trim().toLowerCase();
+    if(seenIds.has(item.id)||(isPagos&&seenNames.has(nameKey))){
+      hadDuplicates=true;
+      if(s.checked?.[item.id]) delete s.checked[item.id];
+      if(s.inventoryPending?.[item.id]) delete s.inventoryPending[item.id];
+      if(s.itemCosts?.[item.id]) delete s.itemCosts[item.id];
+      return;
+    }
+    seenIds.add(item.id);
+    if(isPagos) seenNames.add(nameKey);
+    cleanInv.push(item);
+  });
+  if(cleanInv.length!==s.inventoryItems.length||hadDuplicates){
+    s.inventoryItems=cleanInv;
+  }
+
+  s.inventoryItems.forEach(item=>{
+    if(!item.baseCatId){
+      const match=activeCatalog.find(c=>c.items.some(i=>i.id===item.id||i.name.toLowerCase()===item.name.toLowerCase()));
+      item.baseCatId=match?match.id:(isPagos?'p-bas':'c-aba');
+    }
+    const isPending=!!s.inventoryPending?.[item.id]||s.checked?.[item.id]?.bought===false;
+    if(!isPending){
+      if(s.checked[item.id]?.bought!==true){
         s.checked[item.id]={bought:true,fromInventory:true,who:'sistema',ts:Date.now()};
       }
-    });
-  }
+      if(s.inventoryPending?.[item.id]){
+        delete s.inventoryPending[item.id];
+      }
+    } else {
+      if(!s.inventoryPending[item.id]){
+        s.inventoryPending[item.id]={catId:item.baseCatId,ts:Date.now()};
+      }
+      if(s.checked[item.id]?.bought!==false){
+        s.checked[item.id]={bought:false,who:CU?.name||'sistema',ts:Date.now()};
+      }
+    }
+  });
 
   const chk=s.checked;
   const flt=shopFilter[list.id]||'all';

@@ -1,4 +1,4 @@
-const CACHE='mh-v21-sync';
+const CACHE='mh-v22-clean';
 const ASSETS=['./'];
 
 self.addEventListener('install',e=>{
