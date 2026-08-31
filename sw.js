@@ -1,4 +1,4 @@
-const CACHE='mh-v22-clean';
+const CACHE='mh-v41-smart-analytics-engine';
 const ASSETS=['./'];
 
 self.addEventListener('install',e=>{
