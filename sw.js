@@ -1,4 +1,4 @@
-const CACHE='mh-v42-crisp-inputs-contrast';
+const CACHE='mh-v43-smart-inputs-contrast';
 const ASSETS=['./'];
 
 self.addEventListener('install',e=>{
