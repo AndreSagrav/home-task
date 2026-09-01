@@ -1730,16 +1730,108 @@ body.dark .tcat-card{border-color:var(--sand);}
 body.dark .tcat{border-color:var(--sand);}
 body.dark .sc-card{background:var(--warm);}
 body.dark .pay-item{background:var(--warm);}
-body.dark .shop-item:hover{background:rgba(61,43,31,.4);}
-body.dark .fg input{background:var(--bg-input);border-color:var(--sand);}
-body.dark .fg input:focus{background:var(--bg-card);}
+body.dark .fg input{background:var(--bg-input);border-color:var(--sand);color:#FFFFFF !important;-webkit-text-fill-color:#FFFFFF !important;}
+body.dark .fg input:focus{background:#1E140D !important;}
 
-/* ── ACCESIBILIDAD ── */
-body{line-height:1.6;}
-.shop-iname,.t-text,.cat-name{line-height:1.6;}
-@media(prefers-contrast:high){
-  .shop-cat,.tcat-card,.tcat,.sc-card,.pay-item{border-width:2px;}
-  .modal-card{border-width:2px;}
+/* ── ESTILOS GLOBALES DE INPUTS / FORMULARIOS ── */
+input, select, textarea {
+  font-family:'Montserrat',system-ui,sans-serif;
+  letter-spacing:.01em;
+  color:var(--text);
+  background-color:var(--bg-input);
+  border:1.5px solid var(--sand);
+  outline:none;
+  -webkit-text-fill-color:var(--text);
+}
+input::placeholder, textarea::placeholder {
+  color:var(--muted);
+  opacity:.65;
+  -webkit-text-fill-color:var(--muted);
+}
+.mbc-price-row{
+  display:flex;
+  align-items:center;
+  gap:.6rem;
+  margin-bottom:.45rem;
+  background:var(--bg-input);
+  border:1.5px solid var(--sand);
+  border-radius:12px;
+  padding:.35rem .75rem;
+}
+.mbc-price-lbl{flex:1;min-width:0;}
+.mbc-price-lbl .mpr-name{font-size:.84rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mbc-price-inp{
+  width:110px;
+  padding:.38rem .65rem;
+  font-size:1rem;
+  font-weight:700;
+  text-align:right;
+  border:1.5px solid var(--sand);
+  border-radius:9px;
+  background:var(--bg-card);
+  color:var(--text);
+}
+.mbc-detail-fields{
+  display:grid;
+  grid-template-columns:1.2fr 1fr 1fr;
+  gap:.4rem;
+  margin-top:.45rem;
+}
+.mbc-detail-inp{
+  width:100%;
+  padding:.4rem .65rem;
+  font-size:.82rem;
+  border:1.5px solid var(--sand);
+  border-radius:9px;
+  background:var(--bg-input);
+  color:var(--text);
+}
+
+/* ── MODO OSCURO: CONTRASTE MÁXIMO EN TODAS LAS ENTRADAS DE TEXTO ── */
+body.dark input,
+body.dark select,
+body.dark textarea,
+body.dark input[type="text"],
+body.dark input[type="number"],
+body.dark input[type="search"],
+body.dark input[type="email"],
+body.dark input[type="password"],
+body.dark .mbc-price-inp,
+body.dark .mbc-detail-inp,
+body.dark .mfg input,
+body.dark .modal-card input,
+body.dark .modal-card select,
+body.dark .modal-card textarea,
+body.dark .shop-add-body input,
+body.dark .sub-add-form input,
+body.dark .inv-add-inp,
+body.dark .pay-extra-inp,
+body.dark .pay-date,
+body.dark .ap-select,
+body.dark .ap-search {
+  color:#FFFFFF !important;
+  background-color:#170F0A !important;
+  border-color:rgba(212,150,60,.45) !important;
+  -webkit-text-fill-color:#FFFFFF !important;
+}
+
+body.dark input:focus,
+body.dark select:focus,
+body.dark textarea:focus,
+body.dark .mbc-price-inp:focus,
+body.dark .mbc-detail-inp:focus,
+body.dark .mfg input:focus {
+  border-color:#E8A878 !important;
+  box-shadow:0 0 0 3px rgba(232,168,120,.25) !important;
+  background-color:#22170E !important;
+  color:#FFFFFF !important;
+  -webkit-text-fill-color:#FFFFFF !important;
+}
+
+body.dark input::placeholder,
+body.dark textarea::placeholder {
+  color:rgba(245,232,216,.45) !important;
+  -webkit-text-fill-color:rgba(245,232,216,.45) !important;
 }
 @media(prefers-reduced-motion:reduce){
   *{animation-duration:.01ms !important;transition-duration:.01ms !important;}
@@ -7331,7 +7423,7 @@ function openSubBuyConfirm(lid,itemId,subId){
   const otherDiv=document.getElementById('sub-mbc-store-name-div')||document.createElement('div');
   otherDiv.id='sub-mbc-store-name-div';
   otherDiv.style.cssText='display:none;margin-top:.5rem;';
-  otherDiv.innerHTML=`<label style="font-size:.72rem;color:var(--muted);display:block;margin-bottom:.2rem;">Nombre de la tienda:</label><input type="text" id="sub-mbc-store-name-input" placeholder="Ej: Walmart, etc." maxlength="50" style="width:100%;padding:.4rem .6rem;border:1.5px solid var(--sand);border-radius:8px;font-size:.85rem;background:var(--bg-card);" oninput="subMbcUpdateStoreName(this.value)">`;
+  otherDiv.innerHTML=`<label style="font-size:.74rem;color:var(--muted);font-weight:600;display:block;margin-bottom:.3rem;">Nombre de la tienda:</label><input type="text" id="sub-mbc-store-name-input" placeholder="Ej: Walmart, etc." maxlength="50" style="width:100%;padding:.48rem .75rem;border:1.5px solid var(--sand);border-radius:10px;font-size:.9rem;background:var(--bg-input);color:var(--text);outline:none;" oninput="subMbcUpdateStoreName(this.value)">`;
   stDiv.parentNode.insertBefore(otherDiv,stDiv.nextSibling);
   openModal('modal-sub-buy');
   setTimeout(()=>document.getElementById('sub-mbc-price')?.focus(),120);
@@ -7567,7 +7659,7 @@ function openBuyConfirm(lid,itemId,itemName,list){
   const otherDiv=document.getElementById('mbc-store-name-div')||document.createElement('div');
   otherDiv.id='mbc-store-name-div';
   otherDiv.style.cssText='display:none;margin-top:.5rem;';
-  otherDiv.innerHTML=`<label style="font-size:.72rem;color:var(--muted);display:block;margin-bottom:.2rem;">Nombre de la tienda:</label><input type="text" id="mbc-store-name-input" placeholder="Ej: Walmart, Auto Mercado, etc." maxlength="50" style="width:100%;padding:.4rem .6rem;border:1.5px solid var(--sand);border-radius:8px;font-size:.85rem;background:var(--bg-card);" oninput="mbcUpdateStoreName(this.value)">`;
+  otherDiv.innerHTML=`<label style="font-size:.74rem;color:var(--muted);font-weight:600;display:block;margin-bottom:.3rem;">Nombre de la tienda:</label><input type="text" id="mbc-store-name-input" placeholder="Ej: Walmart, Auto Mercado, etc." maxlength="50" style="width:100%;padding:.48rem .75rem;border:1.5px solid var(--sand);border-radius:10px;font-size:.9rem;background:var(--bg-input);color:var(--text);outline:none;" oninput="mbcUpdateStoreName(this.value)">`;
   stDiv.parentNode.insertBefore(otherDiv,stDiv.nextSibling);
   // Cambiar texto del botón según si es pagos o compras
   document.getElementById('mbc-confirm').textContent=isPagos?'✓ Confirmar':'🛒 Al carrito';
