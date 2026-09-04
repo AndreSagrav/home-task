@@ -1,4 +1,4 @@
-const CACHE='mh-v43-smart-inputs-contrast';
+const CACHE='mh-v44-restore-all-history-time';
 const ASSETS=['./'];
 
 self.addEventListener('install',e=>{

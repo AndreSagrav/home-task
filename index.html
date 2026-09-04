@@ -10978,13 +10978,39 @@ function facturaHistoryEntries(hours=24,factList=_facturas){
   return rows;
 }
 
-async function openPurchaseHistory(todayOnly=true){
+let _histFilterToday = false;
+
+async function openPurchaseHistory(todayOnly=false){
+  _histFilterToday = todayOnly;
   const panel=document.getElementById('hist-panel');
   const bg=document.getElementById('hist-bg');
   panel.style.transform='translateX(0)';
   bg.style.display='block';
-  document.getElementById('hist-list').innerHTML='<p style="color:var(--muted);font-size:.85rem;padding:.5rem 0">Cargando…</p>';
+
+  // Actualizar estilo visual de los botones de filtro
+  const btnToday=document.getElementById('hist-btn-today');
+  const btnAll=document.getElementById('hist-btn-all');
+  if(btnToday && btnAll){
+    if(todayOnly){
+      btnToday.style.background='var(--tc)';
+      btnToday.style.color='#fff';
+      btnToday.style.borderColor='var(--tc)';
+      btnAll.style.background='none';
+      btnAll.style.color='#B89880';
+      btnAll.style.borderColor='rgba(255,255,255,.12)';
+    } else {
+      btnAll.style.background='var(--tc)';
+      btnAll.style.color='#fff';
+      btnAll.style.borderColor='var(--tc)';
+      btnToday.style.background='none';
+      btnToday.style.color='#B89880';
+      btnToday.style.borderColor='rgba(255,255,255,.12)';
+    }
+  }
+
+  document.getElementById('hist-list').innerHTML='<p style="color:var(--muted);font-size:.85rem;padding:.5rem 0">Cargando historial completo…</p>';
   document.getElementById('hist-summary').textContent='';
+
   if(!CH){
     try{
       const houses=getMyHouses(CU?.id);
@@ -10998,53 +11024,26 @@ async function openPurchaseHistory(todayOnly=true){
       return;
     }
   }
+
   try{
     // Reintentar enviar pendientes antes de leer
     await flushPendingHistory();
-    const todayStart=new Date();todayStart.setHours(0,0,0,0);
-    const since24=new Date(Date.now()-24*3600*1000).toISOString();
-    let q=sb.from('purchase_history')
-      .select('*')
-      .eq('house_id',CH.shareCode);
+
+    // Cargar TODAS las compras históricas (purchase_history + facturas desglosadas + pendientes + logs)
+    const scopeHouse = CH?.shareCode || null;
+    const allRows = await _loadMergedPurchases(scopeHouse);
+
+    let finalRows = allRows;
     if(todayOnly){
-      // Ventana últimas 24h para asegurar que aparezcan las compras recientes aunque haya offsets
-      q=q.gte('bought_at',since24).order('bought_at',{ascending:false}).limit(200);
+      const since24=new Date(Date.now()-24*3600*1000).toISOString();
+      finalRows = allRows.filter(r => r.bought_at && r.bought_at >= since24);
+      document.getElementById('hist-summary').textContent=`Últimas 24h: ${finalRows.length} compra(s)`;
     } else {
-      q=q.order('bought_at',{ascending:false}).limit(300);
+      document.getElementById('hist-summary').textContent=`Historial completo en el tiempo: ${finalRows.length} compra(s) registradas`;
     }
-    const {data,error}=await q;
-    if(error)throw error;
-    // Fusionar con pendientes locales (si existieran por fallas previas)
-    const pending=getPendingHistory();
-    const factHours=todayOnly?24:24*7;
-    // Facturas locales ya cargadas en memoria
-    const factRowsLocal=facturaHistoryEntries(factHours,_facturas);
-    // Facturas remotas recientes
-    let factRowsRemote=[];
-    try{
-      const sinceFact=new Date(Date.now()-factHours*3600*1000).toISOString();
-      const {data:factData}=await sb.from('facturas')
-        .select('*')
-        .eq('house_id',CH.shareCode)
-        .gte('created_at',sinceFact)
-        .order('created_at',{ascending:false})
-        .limit(200);
-      factRowsRemote=facturaHistoryEntries(factHours,factData||[]).map(r=>({...r,__factura:true}));
-    }catch(_){/*silencio*/}
-    // Actividad reciente (compras/pagos) como respaldo siempre visible
-    const actRows=activityHistoryEntries(factHours);
-    // Combinar todo y deduplicar por id
-    const mergedMap=new Map();
-    [...(data||[]),...pending,...factRowsLocal,...factRowsRemote,...actRows].forEach(r=>{
-      if(!r||!r.id) return;
-      if(!mergedMap.has(r.id)) mergedMap.set(r.id,r);
-    });
-    const merged=[...mergedMap.values()].sort((a,b)=>new Date(b.bought_at||b.ts||0)-new Date(a.bought_at||a.ts||0));
-    const summaryLabel = todayOnly ? 'Últimas 24h (incl. facturas locales/remotas)' : 'Últimas compras';
-    _histData=merged;
+
+    _histData=finalRows;
     renderPurchaseHistory(_histData);
-    const total=_histData.length;
-    document.getElementById('hist-summary').textContent=`${summaryLabel}: ${total} compra(s)`;
   }catch(e){
     const pending=getPendingHistory();
     if(pending.length){
@@ -13257,12 +13256,12 @@ if(!navigator.onLine) showBanner();
 <!-- ════ PURCHASE HISTORY PANEL ════ -->
 <div class="log-overlay" id="hist-bg" onclick="closePurchaseHistory()"></div>
 <div id="hist-panel" style="position:fixed;top:0;right:0;bottom:0;width:420px;max-width:100vw;background:#1E1610;box-shadow:-4px 0 30px rgba(0,0,0,.4);z-index:300;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1)">
-  <div style="background:#130D08;padding:1rem 1.2rem;display:flex;align-items:center;gap:.8rem;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.08)">
+  <div style="background:#130D08;padding:1rem 1.2rem;display:flex;align-items:center;gap:.6rem;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.08)">
     <span style="font-size:1.1rem">📊</span>
     <h2 style="font-family:'Fraunces',Georgia,serif;color:#E8D0B8;font-size:1.1rem;font-weight:400;flex:1">Historial de Compras</h2>
-    <button onclick="openPurchaseHistory(true)" title="Solo hoy" style="background:none;border:1px solid rgba(255,255,255,.12);color:#B89880;font-size:.9rem;cursor:pointer;padding:.25rem .5rem;border-radius:8px">Hoy</button>
-    <button onclick="openPurchaseHistory(false)" title="Todo" style="background:none;border:1px solid rgba(255,255,255,.12);color:#B89880;font-size:.9rem;cursor:pointer;padding:.25rem .5rem;border-radius:8px">Todo</button>
-    <button onclick="openPurchaseHistory(true)" title="Actualizar" style="background:none;border:none;color:#B89880;font-size:1rem;cursor:pointer;padding:.2rem .4rem;border-radius:6px">🔄</button>
+    <button id="hist-btn-today" onclick="openPurchaseHistory(true)" title="Solo últimas 24 horas" style="background:none;border:1px solid rgba(255,255,255,.12);color:#B89880;font-size:.82rem;cursor:pointer;padding:.25rem .6rem;border-radius:8px">Hoy</button>
+    <button id="hist-btn-all" onclick="openPurchaseHistory(false)" title="Todo el historial en el tiempo" style="background:var(--tc);border:1px solid var(--tc);color:#fff;font-size:.82rem;cursor:pointer;padding:.25rem .6rem;border-radius:8px;font-weight:600">Todo</button>
+    <button onclick="openPurchaseHistory(_histFilterToday)" title="Actualizar" style="background:none;border:none;color:#B89880;font-size:1rem;cursor:pointer;padding:.2rem .4rem;border-radius:6px">🔄</button>
     <button onclick="closePurchaseHistory()" style="background:none;border:none;color:#B89880;font-size:1.1rem;cursor:pointer;padding:.2rem .4rem;border-radius:6px">✕</button>
   </div>
   <div style="padding:.7rem .9rem;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0">
