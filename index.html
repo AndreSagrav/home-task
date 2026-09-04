@@ -650,22 +650,22 @@ main{max-width:1100px;margin:0 auto;padding:2rem 1.6rem;}
 .act-btn.has-note{background:rgba(212,150,60,.18);border-color:rgba(212,150,60,.5);}
 .act-btn.open{background:var(--tc);color:white;border-color:var(--tc);}
 .shop-imeta{display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;}
-.sbadge{font-size:.72rem;padding:.18rem .55rem;border-radius:20px;white-space:nowrap;cursor:default;font-weight:600;letter-spacing:.01em;}
+.sbadge{font-size:.88rem;min-width:24px;height:24px;padding:0 3px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;cursor:default;line-height:1;box-sizing:border-box;}
 .sb-pali {background:#5A3E28;color:#F5E8D8;border:1.5px solid #7A5438;}
 .sb-verd {background:#1E4A28;color:#C8F0D0;border:1.5px solid #2E6A38;}
 .sb-carn {background:#5A1E18;color:#F5C8C0;border:1.5px solid #7A2E28;}
-.sb-superm{background:#4A3A20;color:#E8D8C0;border:1.5px solid #6A5A40;}
+.sb-superm,.sb-super{background:#4A3A20;color:#E8D8C0;border:1.5px solid #6A5A40;}
 .sb-minis {background:#3A4A50;color:#C8D8E0;border:1.5px solid #5A6A70;}
 .sb-feria {background:#5A4A30;color:#E8D8C0;border:1.5px solid #7A6A50;}
 .sb-panaderia{background:#6A5A30;color:#F5E8D0;border:1.5px solid #8A7A50;}
 .sb-farmacia{background:#3A5A70;color:#C8E0F0;border:1.5px solid #5A7A90;}
 .sb-hogar {background:#4A4A50;color:#D0D0D8;border:1.5px solid #6A6A70;}
 .sb-cust {background:#3A2058;color:#D8C8F8;border:1.5px solid #5A3878;font-weight:600;}
-.sb-icust{background:#4A2A10;color:#F0D0A0;border:1.5px solid #6A4A28;display:inline-flex;align-items:center;gap:.18rem;font-weight:600;}
-.sb-icust .sx{cursor:pointer;opacity:.6;font-size:.58rem;line-height:1;}
-.sb-icust .sx:hover{opacity:1;}
-.badge-add-btn{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;
-  border-radius:50%;border:1.5px dashed var(--sand);background:none;cursor:pointer;font-size:.7rem;
+.sb-icust{background:#4A2A10;color:#F0D0A0;border:1.5px solid #6A4A28;display:inline-flex;align-items:center;gap:.18rem;font-weight:600;min-width:28px;padding:0 4px 0 5px;}
+.sb-icust .sx{cursor:pointer;opacity:.65;font-size:.62rem;line-height:1;margin-left:1px;}
+.sb-icust .sx:hover{opacity:1;color:#ff8080;}
+.badge-add-btn{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;
+  border-radius:50%;border:1.5px dashed var(--sand);background:none;cursor:pointer;font-size:.75rem;
   color:var(--muted);line-height:1;transition:all .15s;flex-shrink:0;}
 .badge-add-btn:hover{border-color:var(--sage);color:var(--sage);background:rgba(107,143,113,.1);}
 .badge-store-picker{display:inline-flex;align-items:center;gap:.3rem;flex-wrap:wrap;margin-top:.25rem;width:100%;}
@@ -6812,17 +6812,21 @@ function shopItemHTML(item,list,flt,isCustom,catId){
   if(!list.shopping.hiddenStores)list.shopping.hiddenStores={};
   const hiddenForItem=list.shopping.hiddenStores[item.id]||[];
   const hiddenFilters=list.shopping.hiddenFilters||[];
-  const badges=(item.stores||['pali'])
+  const badges=(item.stores||[])
     .filter(s=>flt==='all'||s===flt)
     .filter(s=>!hiddenForItem.includes(s))
     .filter(s=>!hiddenFilters.includes(s))
-    .map(s=>STORES[s]?`<span class="sbadge ${STORES[s].cls}" style="display:inline-flex;align-items:center;gap:.15rem">${STORES[s].icon} ${STORES[s].name}</span>`:'').join('');
-  const custBadge=isCustom?`<span class="sbadge sb-cust">✨ Personal</span>`:'';
+    .map(s=>STORES[s]?`<span class="sbadge ${STORES[s].cls}" title="${STORES[s].name}">${STORES[s].icon}</span>`:'').join('');
+  const custBadge=isCustom?`<span class="sbadge sb-cust" title="Artículo Personal">✨</span>`:'';
   // custom per-item store suggestions
   const itemStores=list.shopping.itemStores[item.id]||[];
   const itemStoreBadges=itemStores
     .filter(s=>flt==='all'||s.name.toLowerCase()===flt.toLowerCase()||s.id===flt)
-    .map(s=>`<span class="sbadge sb-icust">🏪 ${esc(s.name)}<span class="sx" onclick="delItemStore(event,'${lid}','${item.id}','${s.id}')">✕</span></span>`).join('');
+    .map(s=>{
+      const matchedStore=Object.values(STORES).find(st=>st.name.toLowerCase()===s.name.toLowerCase());
+      const icon=matchedStore?matchedStore.icon:'🏪';
+      return `<span class="sbadge sb-icust" title="${esc(s.name)}">${icon}<span class="sx" title="Quitar sugerencia" onclick="delItemStore(event,'${lid}','${item.id}','${s.id}')">✕</span></span>`;
+    }).join('');
   const baOpen=badgeAddOpen[lid+'_'+item.id]===true;
   // Picker de sugerencias de tienda (8 fijas, excluyendo catalogo y ya agregadas)
   const allAvailableStores=Object.entries(STORES).map(([key,s])=>({id:key,name:s.name,icon:s.icon}));
