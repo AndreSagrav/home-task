@@ -1,4 +1,4 @@
-const CACHE='mh-v44-restore-all-history-time';
+const CACHE='mh-v46-reverted-clean';
 const ASSETS=['./'];
 
 self.addEventListener('install',e=>{
