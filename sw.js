@@ -1,4 +1,4 @@
-const CACHE='mh-v44-restore-all-history-time';
+const CACHE='mh-v45-aligned-shop-items';
 const ASSETS=['./'];
 
 self.addEventListener('install',e=>{
