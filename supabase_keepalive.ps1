@@ -9,13 +9,31 @@ $Headers = @{
     "Authorization" = "Bearer $SupaKey"
 }
 
-try {
-    $res = Invoke-RestMethod -Uri $SupaUrl -Headers $Headers -Method Get -TimeoutSec 15
-    $log = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Supabase Ping OK - Proyecto activo."
-    Write-Output $log
-    Add-Content -Path "$PSScriptRoot\supabase_keepalive.log" -Value $log -ErrorAction SilentlyContinue
-} catch {
-    $err = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Error en Supabase Ping: $($_.Exception.Message)"
-    Write-Output $err
-    Add-Content -Path "$PSScriptRoot\supabase_keepalive.log" -Value $err -ErrorAction SilentlyContinue
+$maxRetries = 5
+$retryDelaySec = 15
+$success = $false
+
+for ($attempt = 1; $attempt -le $maxRetries; $attempt++) {
+    try {
+        $res = Invoke-RestMethod -Uri $SupaUrl -Headers $Headers -Method Get -TimeoutSec 15
+        $log = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Supabase Ping OK - Proyecto activo (Intento $attempt)."
+        Write-Output $log
+        Add-Content -Path "$PSScriptRoot\supabase_keepalive.log" -Value $log -ErrorAction SilentlyContinue
+        $success = $true
+        break
+    } catch {
+        $msg = $_.Exception.Message
+        $err = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Advertencia en intento $attempt de ${maxRetries} - $msg"
+        Write-Output $err
+        Add-Content -Path "$PSScriptRoot\supabase_keepalive.log" -Value $err -ErrorAction SilentlyContinue
+        if ($attempt -lt $maxRetries) {
+            Start-Sleep -Seconds $retryDelaySec
+        }
+    }
+}
+
+if (-not $success) {
+    $fatal = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Error critico: Supabase Ping fallo tras ${maxRetries} intentos."
+    Write-Output $fatal
+    Add-Content -Path "$PSScriptRoot\supabase_keepalive.log" -Value $fatal -ErrorAction SilentlyContinue
 }
