@@ -35,8 +35,8 @@
 })();
 </script>
 <title>Mi Hogar</title>
-<meta name="app-version" content="MH-INV-20260308-0327">
-<!-- BUILD: MH-INV-20260308-0327 -->
+<meta name="app-version" content="MH-INV-20261001-2000">
+<!-- BUILD: MH-INV-20261001-2000 -->
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,400&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ════════════════════════════════════════════════════════
@@ -1858,6 +1858,50 @@ body.dark textarea::placeholder {
   color:rgba(245,232,216,.45) !important;
   -webkit-text-fill-color:rgba(245,232,216,.45) !important;
 }
+
+/* ══════════════════════ AUTOFILL Y ESTADOS DESHABILITADOS ══════════════════════ */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #FFFFFF inset !important;
+  -webkit-text-fill-color: #2A1A10 !important;
+  caret-color: #2A1A10 !important;
+  color: #2A1A10 !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+body.dark input:-webkit-autofill,
+body.dark input:-webkit-autofill:hover, 
+body.dark input:-webkit-autofill:focus, 
+body.dark input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #1A120B inset !important;
+  -webkit-text-fill-color: #FFF8F0 !important;
+  caret-color: #FFF8F0 !important;
+  color: #FFF8F0 !important;
+  border-color: rgba(212,150,60,.45) !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+input:disabled, textarea:disabled {
+  opacity: 1 !important;
+  cursor: default;
+}
+body:not(.dark) input:disabled {
+  background-color: #F4EFE6 !important;
+  color: #3D2B1F !important;
+  -webkit-text-fill-color: #3D2B1F !important;
+  -webkit-box-shadow: 0 0 0 1000px #F4EFE6 inset !important;
+  border-color: var(--sand) !important;
+}
+body.dark input:disabled {
+  background-color: #261A12 !important;
+  color: #F5E8D8 !important;
+  -webkit-text-fill-color: #F5E8D8 !important;
+  -webkit-box-shadow: 0 0 0 1000px #261A12 inset !important;
+  border-color: rgba(212,150,60,.35) !important;
+}
+
 @media(prefers-reduced-motion:reduce){
   *{animation-duration:.01ms !important;transition-duration:.01ms !important;}
 }
@@ -4145,17 +4189,16 @@ async function renderHome(){
       if(!data){ doLogout(); return; }
     }catch(e){ /* sin conexión, continuar */ }
   }
-  // Limpiar perfiles locales que ya no existen en Supabase
+  // Sincronizar perfiles con Supabase de forma segura
   const profiles=getProfiles();
   if(profiles.length&&navigator.onLine){
     try{
-      const {data:existing}=await sb.from('profiles').select('id');
-      if(existing){
+      const {data:existing,error:pErr}=await sb.from('profiles').select('id');
+      if(!pErr && existing && existing.length>0){
         const validIds=new Set(existing.map(p=>p.id));
         const validProfiles=profiles.filter(p=>validIds.has(p.id));
-        if(validProfiles.length!==profiles.length){
-          localStorage.setItem('mh_profiles',JSON.stringify(validProfiles));
-          // Limpiar sesiones de perfiles eliminados
+        if(validProfiles.length && validProfiles.length!==profiles.length){
+          localStorage.setItem(K_PROFILES,JSON.stringify(validProfiles));
           profiles.forEach(p=>{
             if(!validIds.has(p.id)) clearSession(p.id);
           });
@@ -4164,7 +4207,6 @@ async function renderHome(){
     }catch(e){ /* sin conexión, continuar */ }
   }
   // Verificar si algún perfil tiene sesión guardada — entrar directo
-  const isLocal=location.protocol==='file:'||!navigator.onLine;
   for(const p of profiles){
     if(loadSession(p.id)&&p.name&&p.id){
       CU=p;
@@ -4173,11 +4215,7 @@ async function renderHome(){
         return;
       }catch(e){
         console.warn('renderHome session restore failed:',e.message);
-        CU=null;
-        // Solo limpiar sesión si es error de autenticación, no de red o file://
-        if(!isLocal&&!e.message?.includes('fetch')){
-          clearSession(p.id);
-        }
+        // Mantener la sesión guardada para evitar desloguear por caídas temporales
       }
     }
   }

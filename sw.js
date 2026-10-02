@@ -1,4 +1,4 @@
-const CACHE='mh-v47-compact-store-badges';
+const CACHE='mh-v48-autofill-contrast-fix';
 const ASSETS=['./'];
 
 self.addEventListener('install',e=>{
