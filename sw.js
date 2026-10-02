@@ -1,4 +1,4 @@
-const CACHE='mh-v48-autofill-contrast-fix';
+const CACHE='mh-v49-safe-merge-flush';
 const ASSETS=['./'];
 
 self.addEventListener('install',e=>{

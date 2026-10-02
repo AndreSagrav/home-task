@@ -35,8 +35,8 @@
 })();
 </script>
 <title>Mi Hogar</title>
-<meta name="app-version" content="MH-INV-20261001-2000">
-<!-- BUILD: MH-INV-20261001-2000 -->
+<meta name="app-version" content="MH-INV-20261001-2005">
+<!-- BUILD: MH-INV-20261001-2005 -->
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,400&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ════════════════════════════════════════════════════════
@@ -5052,16 +5052,35 @@ async function enterHouse(house){
     // Sin datos reales: mostrar spinner y esperar Supabase
     document.getElementById('panels').innerHTML=
       '<div style="padding:3rem;text-align:center;color:var(--muted);font-size:.95rem">⏳ Cargando…</div>';
-  }
+  // 1. Subir cualquier cambio o pago que haya quedado atrapado localmente cuando Supabase se congeló
+  try{
+    if(typeof flushPendingHistory==='function') await flushPendingHistory();
+    if(typeof processOfflineQueue==='function') await processOfflineQueue();
+  }catch(_flushErr){console.warn('pre-load flush error:', _flushErr);}
 
-  // SIEMPRE cargar datos frescos de Supabase
+  // 2. Cargar datos frescos de Supabase preservando cambios locales más recientes
   try{
     const result=await loadHouseFromSupabase(CH.shareCode);
     if(result&&result.houseData?.lists?.length){
-      UD.lists=result.houseData.lists;
+      const remoteLists=result.houseData.lists;
+      const localLists=UD.lists||[];
+      
+      // Fusión inteligente: si la lista local tiene cambios más recientes o pendientes, conservarla y resincronizarla
+      const mergedLists = remoteLists.map(rl => {
+        const ll = localLists.find(l => l.id === rl.id);
+        if(!ll) return rl;
+        const localTs = new Date(ll._updated_at || 0).getTime();
+        const remoteTs = new Date(rl.updated_at || rl._updated_at || 0).getTime();
+        if(localTs > remoteTs){
+          // El cambio local es más nuevo: programar su subida inmediata
+          setTimeout(()=>syncListToSupabase(ll), 500);
+          return ll;
+        }
+        return rl;
+      });
+
+      UD.lists=mergedLists;
       UD.meta=result.houseData.meta||UD.meta;
-      // Usar siempre la primera lista real de Supabase como activa
-      // No preservar activeListId local — puede ser de listas por defecto
       UD.activeListId=UD.lists[0].id;
       localStorage.setItem(K_HOUSE_DATA(CH.shareCode),JSON.stringify(UD));
       renderAll();
