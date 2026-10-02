@@ -1,0 +1,38 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # Se ejecuta todos los días a las 07:00 UTC
+    - cron: '0 7 * * *'
+  workflow_dispatch: # Permite ejecución manual desde la pestaña Actions en GitHub
+
+jobs:
+  keepalive:
+    name: Ping Supabase Database
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send keep-alive query to Supabase REST API
+        run: |
+          API_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+          if [ -z "$API_KEY" ]; then
+            API_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNocnNscGx4anpmam5mdnZhemd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2Nzc3OTcsImV4cCI6MjA4ODI1Mzc5N30.09_90M7rtJ12KeQcbipt_ohR2_uJoT1UsylddWD6rno"
+          fi
+
+          echo "Enviando ping de actividad a Supabase..."
+          HTTP_STATUS=$(curl -s -o response.json -w "%{http_code}" \
+            -X GET "https://chrslplxjzfjnfvvazgu.supabase.co/rest/v1/houses?select=id&limit=1" \
+            -H "apikey: $API_KEY" \
+            -H "Authorization: Bearer $API_KEY" \
+            --connect-timeout 15 \
+            --max-time 30)
+
+          echo "Código HTTP recibido: $HTTP_STATUS"
+          cat response.json
+          echo ""
+
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "Ping exitoso. La base de datos de Supabase se mantendrá activa."
+          else
+            echo "Error: Código HTTP $HTTP_STATUS recibido de Supabase."
+            exit 1
+          fi

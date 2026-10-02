@@ -1,0 +1,4 @@
+*.log
+supabase_keepalive.log
+.DS_Store
+Thumbs.db
