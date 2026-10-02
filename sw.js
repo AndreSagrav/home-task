@@ -1,4 +1,4 @@
-const CACHE='mh-v49-safe-merge-flush';
+const CACHE='mh-v50-syntax-fixed';
 const ASSETS=['./'];
 
 self.addEventListener('install',e=>{

@@ -35,8 +35,8 @@
 })();
 </script>
 <title>Mi Hogar</title>
-<meta name="app-version" content="MH-INV-20261001-2005">
-<!-- BUILD: MH-INV-20261001-2005 -->
+<meta name="app-version" content="MH-INV-20261001-2018">
+<!-- BUILD: MH-INV-20261001-2018 -->
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,400&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ════════════════════════════════════════════════════════
@@ -5052,6 +5052,7 @@ async function enterHouse(house){
     // Sin datos reales: mostrar spinner y esperar Supabase
     document.getElementById('panels').innerHTML=
       '<div style="padding:3rem;text-align:center;color:var(--muted);font-size:.95rem">⏳ Cargando…</div>';
+  }
   // 1. Subir cualquier cambio o pago que haya quedado atrapado localmente cuando Supabase se congeló
   try{
     if(typeof flushPendingHistory==='function') await flushPendingHistory();
