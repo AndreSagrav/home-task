@@ -2,8 +2,8 @@ name: Supabase Keep-Alive
 
 on:
   schedule:
-    # Se ejecuta todos los días a las 07:00 UTC
-    - cron: '0 7 * * *'
+    # Se ejecuta dos veces al día (07:00 y 19:00 UTC)
+    - cron: '0 7,19 * * *'
   workflow_dispatch: # Permite ejecución manual desde la pestaña Actions en GitHub
 
 jobs:
@@ -16,6 +16,21 @@ jobs:
           API_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
           if [ -z "$API_KEY" ]; then
             API_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNocnNscGx4anpmam5mdnZhemd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2Nzc3OTcsImV4cCI6MjA4ODI1Mzc5N30.09_90M7rtJ12KeQcbipt_ohR2_uJoT1UsylddWD6rno"
+          fi
+
+          echo "Escribiendo en la BD (RPC ping_keepalive)..."
+          RPC_STATUS=$(curl -s -o rpc.json -w "%{http_code}" \
+            -X POST "https://chrslplxjzfjnfvvazgu.supabase.co/rest/v1/rpc/ping_keepalive" \
+            -H "apikey: $API_KEY" \
+            -H "Authorization: Bearer $API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            --connect-timeout 15 \
+            --max-time 30)
+          echo "RPC HTTP: $RPC_STATUS"; cat rpc.json; echo ""
+          if [ "$RPC_STATUS" -lt 200 ] || [ "$RPC_STATUS" -ge 300 ]; then
+            echo "Error: la escritura keep-alive falló (¿ejecutaste keepalive_setup.sql?)"
+            exit 1
           fi
 
           echo "Enviando ping de actividad a Supabase..."
